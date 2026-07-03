@@ -1,0 +1,49 @@
+# Normalize line endings: let Git handle EOL automatically, storing LF in the repo.
+* text=auto eol=lf
+
+# Explicit text types
+*.ts       text
+*.tsx      text
+*.js       text
+*.jsx      text
+*.json     text
+*.css      text
+*.html     text
+*.md       text
+*.yml      text
+*.yaml     text
+*.sh       text eol=lf
+*.xml      text
+
+# Windows-specific scripts keep CRLF
+*.bat      text eol=crlf
+*.cmd      text eol=crlf
+
+# Binary assets — never diff, never EOL-normalize
+*.db       binary
+*.wasm     binary
+*.apk      binary
+*.dex      binary
+*.idsig    binary
+*.keystore binary
+*.jks      binary
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.gif      binary
+*.webp     binary
+*.mp4      binary
+*.ttf      binary
+*.otf      binary
+*.woff     binary
+*.woff2    binary
+*.ico      binary
+
+# Lockfiles: treat as generated, collapse in diffs/reviews
+package-lock.json  linguist-generated=true -diff
+pnpm-lock.yaml     linguist-generated=true -diff
+yarn.lock          linguist-generated=true -diff
+
+# Exclude vendored / decompiled sources from language stats
+debuggable-apk/**  linguist-vendored
+fixtures/**        linguist-vendored

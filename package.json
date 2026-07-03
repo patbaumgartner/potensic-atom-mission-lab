@@ -1,0 +1,38 @@
+{
+  "name": "atom-mission-lab",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Atom mission planner: program waypoint flight forms and export PotensicPro-compatible map.db",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "generate:sample": "tsx scripts/generate-sample-mapdb.ts"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "sql.js": "^1.14.1"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.21",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@types/sql.js": "^1.4.11",
+    "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-v8": "^4.1.9",
+    "jsdom": "^29.1.1",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.3",
+    "vitest": "^4.1.9"
+  }
+}
