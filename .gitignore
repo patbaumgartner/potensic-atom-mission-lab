@@ -1,0 +1,72 @@
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+node_modules/
+.pnp
+.pnp.js
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ---------------------------------------------------------------------------
+# Build output / caches
+# ---------------------------------------------------------------------------
+dist/
+dist-ssr/
+build/
+coverage/
+*.tsbuildinfo
+.vite/
+.cache/
+.eslintcache
+
+# ---------------------------------------------------------------------------
+# Logs
+# ---------------------------------------------------------------------------
+/logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ---------------------------------------------------------------------------
+# Environment / secrets — never commit these
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.jks
+*.pem
+*.p12
+*.key
+*.pkcs12
+
+# ---------------------------------------------------------------------------
+# Editor / OS
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# ---------------------------------------------------------------------------
+# Reverse-engineering / APK working artifacts (large binaries, ~2 GB)
+# Keep only the human-readable process docs at the top of each capture folder.
+# ---------------------------------------------------------------------------
+debuggable-apk/
+
+# Device / capture pulls
+pulled-logs/
+*.db-shm
+*.db-wal
