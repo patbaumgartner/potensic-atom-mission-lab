@@ -1,0 +1,6 @@
+dist/
+coverage/
+fixtures/
+node_modules/
+*.b64
+package-lock.json
