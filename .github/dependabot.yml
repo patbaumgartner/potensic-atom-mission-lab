@@ -1,35 +1,45 @@
 version: 2
 updates:
-  # npm dependencies for the Vite/React app.
-  - package-ecosystem: npm
-    directory: "/"
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 10
-    labels:
-      - dependencies
-    groups:
-      # Bundle low-risk updates into a single PR to reduce noise.
-      dev-dependencies:
-        dependency-type: development
-        update-types:
-          - minor
-          - patch
-      production-minor-patch:
-        dependency-type: production
-        update-types:
-          - minor
-          - patch
-
-  # Keep the GitHub Actions used in workflows up to date.
-  - package-ecosystem: github-actions
-    directory: "/"
-    schedule:
-      interval: weekly
-    labels:
-      - dependencies
-      - github-actions
-    groups:
-      actions:
-        patterns:
-          - "*"
+- package-ecosystem: npm
+  directory: /
+  schedule:
+    interval: weekly
+    day: monday
+    time: 06:00
+    timezone: Europe/Zurich
+  open-pull-requests-limit: 10
+  labels:
+  - dependencies
+  groups:
+    dev-dependencies:
+      dependency-type: development
+      update-types:
+      - minor
+      - patch
+    production-minor-patch:
+      dependency-type: production
+      update-types:
+      - minor
+      - patch
+  commit-message:
+    prefix: chore(deps)
+    prefix-development: chore(deps-dev)
+    include: scope
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: weekly
+    day: monday
+    time: 06:00
+    timezone: Europe/Zurich
+  labels:
+  - dependencies
+  - github-actions
+  groups:
+    actions:
+      patterns:
+      - '*'
+  open-pull-requests-limit: 5
+  commit-message:
+    prefix: ci(deps)
+    include: scope
