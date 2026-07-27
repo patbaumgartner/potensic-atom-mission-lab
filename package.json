@@ -48,8 +48,8 @@
   },
   "dependencies": {
     "leaflet": "^1.9.4",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "sql.js": "^1.14.1"
   },
   "devDependencies": {
