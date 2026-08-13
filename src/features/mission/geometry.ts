@@ -4,12 +4,21 @@
 // coordinates are WGS84 decimal degrees. We use spherical-earth math which is
 // accurate to well under a meter over the small areas a mission covers.
 
-import type { MissionChunk, Waypoint } from "./missionTypes";
+import { ATOM_LIMITS, type MissionChunk, type Waypoint } from "./missionTypes";
 
 const EARTH_RADIUS_M = 6_371_008.8;
 
 const toRad = (deg: number): number => (deg * Math.PI) / 180;
 const toDeg = (rad: number): number => (rad * 180) / Math.PI;
+
+/**
+ * Wrap a longitude into `[-180, 180)`. Correct for arbitrarily large magnitudes,
+ * unlike the common `((lng + 540) % 360) - 180` trick, which JavaScript's
+ * sign-preserving `%` breaks for inputs below -540.
+ */
+export function normalizeLongitude(lng: number): number {
+  return ((((lng + 180) % 360) + 360) % 360) - 180;
+}
 
 /** Great-circle distance between two points in meters. */
 export function haversineMeters(a: Waypoint, b: Waypoint): number {
@@ -46,7 +55,7 @@ export function destinationPoint(origin: Waypoint, bearing: number, distanceM: n
       Math.sin(brng) * Math.sin(angular) * Math.cos(lat1),
       Math.cos(angular) - Math.sin(lat1) * Math.sin(lat2),
     );
-  return { lat: toDeg(lat2), lng: ((toDeg(lng2) + 540) % 360) - 180 };
+  return { lat: toDeg(lat2), lng: normalizeLongitude(toDeg(lng2)) };
 }
 
 /** Total length of a polyline path in meters. */
@@ -65,12 +74,13 @@ export function estimateDurationSeconds(points: Waypoint[], speedMs: number): nu
 }
 
 /**
- * Resample a polyline so consecutive samples are ~`spacingM` apart.
- * Endpoints are always preserved. Useful to convert a sparse hand-drawn path
- * into an evenly spaced waypoint list.
+ * Resample a polyline so consecutive samples are ~`spacingM` apart, measured
+ * along the path. Both endpoints are always preserved: when the final sample
+ * would land within `minSpacingM` of the true end it is snapped onto it rather
+ * than leaving a degenerate sub-metre leg the drone treats as a duplicate.
  */
 export function resamplePath(points: Waypoint[], spacingM: number): Waypoint[] {
-  if (points.length < 2 || spacingM <= 0) return [...points];
+  if (points.length < 2 || !(spacingM > 0)) return [...points];
   const out: Waypoint[] = [points[0]];
   let carry = 0;
   for (let i = 1; i < points.length; i++) {
@@ -87,9 +97,10 @@ export function resamplePath(points: Waypoint[], spacingM: number): Waypoint[] {
     carry = segLen - (distFromA - spacingM);
   }
   const last = points[points.length - 1];
-  if (haversineMeters(out[out.length - 1], last) > spacingM * 0.25) {
-    out.push(last);
-  }
+  const gap = haversineMeters(out[out.length - 1], last);
+  if (gap === 0) return out;
+  if (gap > ATOM_LIMITS.minSpacingM || out.length === 1) out.push(last);
+  else out[out.length - 1] = last;
   return out;
 }
 
@@ -138,7 +149,12 @@ export function circleForm(
 /**
  * Lawnmower / boustrophedon survey grid centered on `center`.
  * `headingDeg` is the direction of the long passes. `passSpacingM` is the
- * lateral distance between passes; `sampleSpacingM` samples along each pass.
+ * maximum lateral distance between passes; `sampleSpacingM` samples along each
+ * pass.
+ *
+ * Passes are distributed evenly so both lateral edges are flown and the
+ * effective spacing never exceeds `passSpacingM` — a survey that skipped the
+ * far edge would leave an unphotographed strip.
  */
 export function gridForm(params: {
   center: Waypoint;
@@ -148,19 +164,22 @@ export function gridForm(params: {
   sampleSpacingM: number;
   headingDeg?: number;
 }): Waypoint[] {
-  const { center, widthM, heightM, passSpacingM, sampleSpacingM } = params;
+  const { center, sampleSpacingM } = params;
+  const widthM = Math.max(0, params.widthM);
+  const heightM = Math.max(0, params.heightM);
   const heading = params.headingDeg ?? 0;
   const across = heading + 90;
-  const passes = Math.max(1, Math.floor(widthM / Math.max(1, passSpacingM)) + 1);
+  const intervals =
+    widthM > 0 && params.passSpacingM > 0 ? Math.ceil(widthM / params.passSpacingM) : 0;
+  const passSpacingM = intervals > 0 ? widthM / intervals : 0;
   // Start at the bottom-left corner of the rectangle.
   const halfLeft = destinationPoint(center, across + 180, widthM / 2);
   const corner = destinationPoint(halfLeft, heading + 180, heightM / 2);
   const out: Waypoint[] = [];
-  for (let p = 0; p < passes; p++) {
+  for (let p = 0; p <= intervals; p++) {
     const base = destinationPoint(corner, across, p * passSpacingM);
-    const start = base;
     const end = destinationPoint(base, heading, heightM);
-    const leg = p % 2 === 0 ? [start, end] : [end, start];
+    const leg = p % 2 === 0 ? [base, end] : [end, base];
     for (const wp of resamplePath(leg, sampleSpacingM)) out.push(wp);
   }
   return out;
@@ -212,9 +231,13 @@ export function starForm(params: {
 /**
  * Split a waypoint list into chunks of at most `size`, producing PotensicPro
  * flight records. Labels are zero-padded 1-based ranges, e.g. "name 001-045".
+ * A non-finite `size` falls back to the Atom cap rather than silently
+ * discarding every waypoint.
  */
 export function chunkWaypoints(name: string, waypoints: Waypoint[], size: number): MissionChunk[] {
-  const cap = Math.max(1, Math.min(size, 45));
+  const max = ATOM_LIMITS.maxWaypointsPerRecord;
+  const requested = Number.isFinite(size) ? Math.floor(size) : max;
+  const cap = Math.max(1, Math.min(requested, max));
   const chunks: MissionChunk[] = [];
   for (let i = 0; i < waypoints.length; i += cap) {
     const slice = waypoints.slice(i, i + cap);
@@ -275,9 +298,9 @@ export function pathDeviation(actual: Waypoint[], planned: Waypoint[]): Deviatio
   return { maxM: max, avgM: sum / actual.length };
 }
 
-/** Reflect points horizontally (mirror longitude) about a center. */
+/** Reflect points east/west across the meridian through `center`. */
 export function mirrorPoints(points: Waypoint[], center: Waypoint): Waypoint[] {
-  return points.map((p) => ({ lat: p.lat, lng: 2 * center.lng - p.lng }));
+  return points.map((p) => ({ lat: p.lat, lng: normalizeLongitude(2 * center.lng - p.lng) }));
 }
 
 /** Ensure a closed loop by appending the first point if needed. */
