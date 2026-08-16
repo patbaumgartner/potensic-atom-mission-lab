@@ -1,4 +1,5 @@
 import { SliderField } from "../paramFields";
+import { MAX_TEXT_LENGTH } from "../missionSchema";
 
 export function MetadataSection({
   name,
@@ -25,7 +26,11 @@ export function MetadataSection({
       <div className="params-list">
         <label>
           Name
-          <input value={name} onChange={(e) => setName(e.target.value)} />
+          <input
+            value={name}
+            maxLength={MAX_TEXT_LENGTH}
+            onChange={(e) => setName(e.target.value)}
+          />
         </label>
         <SliderField
           label="Chunk size"

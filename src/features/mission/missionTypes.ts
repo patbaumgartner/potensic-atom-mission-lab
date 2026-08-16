@@ -43,6 +43,17 @@ export const ATOM_LIMITS = {
   maxWaypointsPerRecord: 45,
   /** Warn when a single record approaches the cap. */
   warnWaypointsPerRecord: 40,
+  /**
+   * Allocation ceiling for a single mission. Form generators clamp to this so
+   * a corrupt or hand-edited parameter set can never hang the tab, and imports
+   * truncate to it. 2000 waypoints is already ~45 flight records.
+   */
+  maxWaypointsPerMission: 2_000,
+  /** Allocation ceiling for the persisted mission library. */
+  maxLibraryEntries: 200,
+  /** Persisted mission metadata ceilings. */
+  maxPlannedHeightM: 10_000,
+  maxPlannedSpeedMs: 100,
   /** Minimum sane spacing between consecutive waypoints (meters). */
   minSpacingM: 1,
   /** Warn above this spacing; very long legs reduce path fidelity (meters). */

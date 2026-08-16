@@ -1,6 +1,9 @@
 // Export helpers: download a Uint8Array or text, and convert to GeoJSON.
 import type { Mission, Waypoint } from "./mission/missionTypes";
 
+// Compact schema-maximum projects are ~24 MiB; leave headroom for UTF-8 names.
+export const MAX_PROJECT_FILE_BYTES = 32 * 1024 * 1024;
+
 export interface ProjectExport {
   library: unknown;
   workspace: unknown;
@@ -33,7 +36,7 @@ function triggerDownload(blob: Blob, filename: string): void {
 
 /** Serialize the mission library + workspace state into a portable JSON blob. */
 export function exportProjectJSON(project: ProjectExport): string {
-  return JSON.stringify({ ...project, exportedAt: new Date().toISOString() }, null, 2);
+  return JSON.stringify({ ...project, exportedAt: new Date().toISOString() });
 }
 
 /** GeoJSON uses [lng, lat] order; multipointbean stores lat, lng. */

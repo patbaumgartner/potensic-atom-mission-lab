@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { circleForm, destinationPoint } from "../src/features/mission/geometry";
 import type { Mission, Waypoint } from "../src/features/mission/missionTypes";
-import { generateMapDb, parseMapDb } from "../src/features/potensic/atomMapDb";
+import {
+  DEFAULT_MAP_DB_PARSE_LIMITS,
+  generateMapDb,
+  parseMapDb,
+} from "../src/features/potensic/atomMapDb";
 import { ATOM_REQUIRED_TABLES, ATOM_USER_VERSION } from "../src/features/potensic/atomSchema";
 import { loadSqlNode } from "../src/features/potensic/sqlLoaderNode";
 
@@ -188,5 +192,45 @@ describe("map.db generation", () => {
       speedMs: 0,
       startedAtMs: 0,
     });
+  });
+
+  it("rejects excessive rows before materializing map.db contents", async () => {
+    const SQL = await loadSqlNode();
+    const bytes = generateMapDb(SQL, [mission()]);
+    const limits = DEFAULT_MAP_DB_PARSE_LIMITS;
+
+    expect(() => parseMapDb(SQL, bytes, { ...limits, maxRecords: 0 })).toThrow(
+      "too many flight records",
+    );
+    expect(() => parseMapDb(SQL, bytes, { ...limits, maxTotalWaypoints: 1 })).toThrow(
+      "too many waypoints",
+    );
+    expect(() => parseMapDb(SQL, bytes, { ...limits, maxWaypointsPerRecord: 1 })).toThrow(
+      "too many waypoints in one flight record",
+    );
+
+    const db = new SQL.Database(generateMapDb(SQL, []));
+    db.run(
+      "INSERT INTO flightnotes (null_lpcolumn, distance, duration, height, speed, starttime) VALUES (0, 0, 0, 0, 0, 0)",
+    );
+    const historyBytes = db.export();
+    db.close();
+    expect(() => parseMapDb(SQL, historyBytes, { ...limits, maxFlightHistoryEntries: 0 })).toThrow(
+      "too many flight history entries",
+    );
+  });
+
+  it("accepts app-generated databases with more records than the mission library limit", async () => {
+    const SQL = await loadSqlNode();
+    const db = new SQL.Database(generateMapDb(SQL, []));
+    const insert = db.prepare(
+      "INSERT INTO flightrecordbean (date, duration, height, mileage, num, speed) VALUES (?, 0, '20', '0', 0, '5')",
+    );
+    for (let index = 0; index < 225; index++) insert.run([`record-${index}`]);
+    insert.free();
+    const bytes = db.export();
+    db.close();
+
+    expect(parseMapDb(SQL, bytes).records).toHaveLength(225);
   });
 });

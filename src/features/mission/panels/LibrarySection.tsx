@@ -1,4 +1,4 @@
-import type { SavedMission } from "../useMissionLibrary";
+import { MAX_TEXT_LENGTH, type SavedMission } from "../missionSchema";
 
 export function LibrarySection({
   library,
@@ -40,6 +40,7 @@ export function LibrarySection({
               <input
                 className="lib-name"
                 value={e.name}
+                maxLength={MAX_TEXT_LENGTH}
                 onChange={(ev) => onRename(e.id, ev.target.value)}
               />
               <span className="lib-count">{e.waypoints.length} wp</span>
