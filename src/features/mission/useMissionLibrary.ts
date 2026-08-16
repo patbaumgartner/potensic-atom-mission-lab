@@ -26,6 +26,10 @@ interface UseMissionLibraryOptions {
   onPersistenceError: (message: string) => void;
 }
 
+export type BatchAddResult =
+  | { ok: true; count: number }
+  | { ok: false; reason: "empty" | "invalid" | "capacity" | "persistence" };
+
 export function useMissionLibrary({
   initialLibrary,
   initialPersistenceBlocked,
@@ -55,6 +59,25 @@ export function useMissionLibrary({
     );
     return false;
   };
+
+  const missionIsValid = (mission: Mission) =>
+    mission.waypoints.length > 0 &&
+    mission.waypoints.length <= ATOM_LIMITS.maxWaypointsPerMission &&
+    Number.isFinite(mission.plannedHeightM) &&
+    mission.plannedHeightM >= 0 &&
+    mission.plannedHeightM <= ATOM_LIMITS.maxPlannedHeightM &&
+    Number.isFinite(mission.plannedSpeedMs) &&
+    mission.plannedSpeedMs >= 0 &&
+    mission.plannedSpeedMs <= ATOM_LIMITS.maxPlannedSpeedMs;
+
+  const toSavedMission = (mission: Mission, index: number): SavedMission => ({
+    id: uid(),
+    name: (mission.name || `Mission ${index + 1}`).slice(0, MAX_TEXT_LENGTH),
+    color: PALETTE[index % PALETTE.length],
+    waypoints: mission.waypoints.map((waypoint) => ({ ...waypoint })),
+    plannedHeightM: mission.plannedHeightM,
+    plannedSpeedMs: mission.plannedSpeedMs,
+  });
 
   // Persist library to localStorage.
   useEffect(() => {
@@ -121,29 +144,26 @@ export function useMissionLibrary({
 
   const addToLibrary = (mission: Mission) => {
     if (!mutationAllowed()) return;
-    if (
-      mission.waypoints.length === 0 ||
-      mission.waypoints.length > ATOM_LIMITS.maxWaypointsPerMission ||
-      !Number.isFinite(mission.plannedHeightM) ||
-      mission.plannedHeightM < 0 ||
-      mission.plannedHeightM > ATOM_LIMITS.maxPlannedHeightM ||
-      !Number.isFinite(mission.plannedSpeedMs) ||
-      mission.plannedSpeedMs < 0 ||
-      mission.plannedSpeedMs > ATOM_LIMITS.maxPlannedSpeedMs
-    ) {
-      return;
-    }
+    if (!missionIsValid(mission)) return;
     if (library.length >= ATOM_LIMITS.maxLibraryEntries) return;
-    const entry: SavedMission = {
-      id: uid(),
-      name: (mission.name || `Mission ${library.length + 1}`).slice(0, MAX_TEXT_LENGTH),
-      color: PALETTE[library.length % PALETTE.length],
-      waypoints: mission.waypoints.map((w) => ({ ...w })),
-      plannedHeightM: mission.plannedHeightM,
-      plannedSpeedMs: mission.plannedSpeedMs,
-    };
+    const entry = toSavedMission(mission, library.length);
     setLibrary((l) => [...l, entry]);
     if (!isImported) setEditingId(entry.id);
+  };
+
+  const addManyToLibrary = (missions: readonly Mission[]): BatchAddResult => {
+    if (missions.length === 0) return { ok: false, reason: "empty" };
+    if (!mutationAllowed()) return { ok: false, reason: "persistence" };
+    if (!missions.every(missionIsValid)) return { ok: false, reason: "invalid" };
+    if (library.length + missions.length > ATOM_LIMITS.maxLibraryEntries) {
+      return { ok: false, reason: "capacity" };
+    }
+    const additions = missions.map((mission, index) =>
+      toSavedMission(mission, library.length + index),
+    );
+    setLibrary((current) => [...current, ...additions]);
+    setEditingId(null);
+    return { ok: true, count: additions.length };
   };
 
   const renameEntry = (id: string, nm: string) => {
@@ -214,6 +234,7 @@ export function useMissionLibrary({
     editingId,
     setEditingId,
     addToLibrary,
+    addManyToLibrary,
     renameEntry,
     removeEntry,
     duplicateEntry,

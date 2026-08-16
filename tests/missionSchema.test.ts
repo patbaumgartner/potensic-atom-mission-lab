@@ -112,8 +112,42 @@ describe("parseFormParams", () => {
       passSpacingM: 0.5,
       startRadiusM: 5_000,
       turns: 0,
+      cinematicMode: DEFAULT_FORM_PARAMS.cinematicMode,
+      cinematicViewCount: DEFAULT_FORM_PARAMS.cinematicViewCount,
+      cinematicViewIndex: DEFAULT_FORM_PARAMS.cinematicViewIndex,
+      buildingWidthM: DEFAULT_FORM_PARAMS.buildingWidthM,
+      buildingDepthM: DEFAULT_FORM_PARAMS.buildingDepthM,
+      buildingClearanceM: DEFAULT_FORM_PARAMS.buildingClearanceM,
+      cinematicShotLengthM: DEFAULT_FORM_PARAMS.cinematicShotLengthM,
+      cinematicLeadInM: DEFAULT_FORM_PARAMS.cinematicLeadInM,
+      cinematicTargetHeightM: DEFAULT_FORM_PARAMS.cinematicTargetHeightM,
       manual: [{ lat: 1, lng: 2 }],
     });
+  });
+
+  it("parses cinematic controls with safe discrete and numeric bounds", () => {
+    const parsed = parseFormParams({
+      kind: "cinematic",
+      cinematicMode: "invalid",
+      cinematicViewCount: 4,
+      cinematicViewIndex: 99,
+      buildingWidthM: 0,
+      buildingDepthM: 30_000,
+      buildingClearanceM: 0,
+      cinematicShotLengthM: 30_000,
+      cinematicLeadInM: -1,
+      cinematicTargetHeightM: 20_000,
+    });
+    expect(parsed.kind).toBe("cinematic");
+    expect(parsed.cinematicMode).toBe("shots");
+    expect(parsed.cinematicViewCount).toBe(4);
+    expect(parsed.cinematicViewIndex).toBe(7);
+    expect(parsed.buildingWidthM).toBe(1);
+    expect(parsed.buildingDepthM).toBe(20_000);
+    expect(parsed.buildingClearanceM).toBe(1);
+    expect(parsed.cinematicShotLengthM).toBe(20_000);
+    expect(parsed.cinematicLeadInM).toBe(0);
+    expect(parsed.cinematicTargetHeightM).toBe(10_000);
   });
 });
 
@@ -241,6 +275,12 @@ describe("workspace and project parsing", () => {
         workspace: { ...DEFAULT_WORKSPACE, v: WORKSPACE_VERSION, editingId: "missing" },
       }),
     ).toBeNull();
+    expect(
+      parseProject({
+        library: [mission()],
+        workspace: { ...DEFAULT_WORKSPACE, v: WORKSPACE_VERSION, editingId: "" },
+      }),
+    ).toBeNull();
   });
 
   it("rejects projects whose accepted values would be transformed", () => {
@@ -303,6 +343,30 @@ describe("persistence", () => {
   it("loads a complete workspace without a write lock", () => {
     const workspace = { ...DEFAULT_WORKSPACE, v: WORKSPACE_VERSION };
     vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(workspace) });
+    expect(loadWorkspaceState()).toEqual({
+      workspace: DEFAULT_WORKSPACE,
+      persistenceBlocked: false,
+    });
+  });
+
+  it("migrates a lossless version-1 workspace without a write lock", () => {
+    const legacyParams = { ...DEFAULT_FORM_PARAMS } as Record<string, unknown>;
+    for (const key of [
+      "cinematicMode",
+      "cinematicViewCount",
+      "cinematicViewIndex",
+      "buildingWidthM",
+      "buildingDepthM",
+      "buildingClearanceM",
+      "cinematicShotLengthM",
+      "cinematicLeadInM",
+      "cinematicTargetHeightM",
+    ]) {
+      delete legacyParams[key];
+    }
+    vi.stubGlobal("localStorage", {
+      getItem: () => JSON.stringify({ ...DEFAULT_WORKSPACE, v: 1, params: legacyParams }),
+    });
     expect(loadWorkspaceState()).toEqual({
       workspace: DEFAULT_WORKSPACE,
       persistenceBlocked: false,

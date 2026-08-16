@@ -1,5 +1,11 @@
 // Build a waypoint list from a chosen flight form and its parameters.
 import {
+  generateCinematicPlan,
+  type CinematicMode,
+  type CinematicPlan,
+  type CinematicViewCount,
+} from "./cinematic";
+import {
   circleForm,
   destinationPoint,
   gridForm,
@@ -10,7 +16,8 @@ import {
 } from "./geometry";
 import type { Waypoint } from "./missionTypes";
 
-export type FormKind = "line" | "polygon" | "circle" | "grid" | "spiral" | "star" | "manual";
+export type FormKind =
+  "line" | "polygon" | "circle" | "grid" | "spiral" | "star" | "cinematic" | "manual";
 
 export interface FormParams {
   kind: FormKind;
@@ -33,6 +40,16 @@ export interface FormParams {
   // spiral
   startRadiusM: number;
   turns: number;
+  // cinematic building shots
+  cinematicMode: CinematicMode;
+  cinematicViewCount: CinematicViewCount;
+  cinematicViewIndex: number;
+  buildingWidthM: number;
+  buildingDepthM: number;
+  buildingClearanceM: number;
+  cinematicShotLengthM: number;
+  cinematicLeadInM: number;
+  cinematicTargetHeightM: number;
   // manual points
   manual: Waypoint[];
 }
@@ -52,8 +69,32 @@ export const DEFAULT_FORM_PARAMS: FormParams = {
   passSpacingM: 12,
   startRadiusM: 5,
   turns: 3,
+  cinematicMode: "shots",
+  cinematicViewCount: 8,
+  cinematicViewIndex: 0,
+  buildingWidthM: 20,
+  buildingDepthM: 15,
+  buildingClearanceM: 20,
+  cinematicShotLengthM: 30,
+  cinematicLeadInM: 10,
+  cinematicTargetHeightM: 5,
   manual: [],
 };
+
+export function buildCinematicPlanFromForm(p: FormParams, flightAltitudeM: number): CinematicPlan {
+  return generateCinematicPlan({
+    center: p.center,
+    frontBearingDeg: p.headingDeg,
+    viewCount: p.cinematicViewCount,
+    buildingWidthM: p.buildingWidthM,
+    buildingDepthM: p.buildingDepthM,
+    clearanceM: p.buildingClearanceM,
+    shotLengthM: p.cinematicShotLengthM,
+    leadInM: p.cinematicLeadInM,
+    flightAltitudeM,
+    targetHeightM: p.cinematicTargetHeightM,
+  });
+}
 
 export function buildForm(p: FormParams): Waypoint[] {
   switch (p.kind) {
@@ -91,6 +132,12 @@ export function buildForm(p: FormParams): Waypoint[] {
         points: p.sides,
         rotationDeg: p.headingDeg,
       });
+    case "cinematic": {
+      const plan = buildCinematicPlanFromForm(p, 0);
+      if (p.cinematicMode === "route") return plan.combinedRoute;
+      const index = Math.min(plan.shots.length - 1, Math.max(0, Math.round(p.cinematicViewIndex)));
+      return [...plan.shots[index].waypoints];
+    }
     case "manual":
       return [...p.manual];
     default:

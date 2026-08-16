@@ -3,9 +3,11 @@ import type { ChangeEvent } from "react";
 import { DroneMark } from "../../components/icons";
 import type { UseMissionImportReturn } from "../../hooks/useMissionImport";
 import type { UseTrackAnalysisReturn } from "../../hooks/useTrackAnalysis";
+import type { CinematicPlan } from "./cinematic";
 import type { FormKind, FormParams } from "./formBuilder";
 import type { ValidationIssue } from "./missionTypes";
 import { AnalysisSection } from "./panels/AnalysisSection";
+import { CinematicSection } from "./panels/CinematicSection";
 import { FormSection } from "./panels/FormSection";
 import { LibrarySection } from "./panels/LibrarySection";
 import { LoadExportSection } from "./panels/LoadExportSection";
@@ -43,6 +45,11 @@ export interface SidebarProps {
   mirrorAcrossCenter: () => void;
   closeLoopPoints: () => void;
   removeLastPoint: () => void;
+  cinematicPlan: CinematicPlan | null;
+  cinematicActionMessage: string | null;
+  onAddCinematicShotPack: () => void;
+  onExportCinematicShotPack: () => void;
+  onExportCinematicChecklist: () => void;
 
   name: string;
   setName: (v: string) => void;
@@ -131,6 +138,20 @@ export function Sidebar(props: SidebarProps) {
           closeLoopPoints={props.closeLoopPoints}
           removeLastPoint={props.removeLastPoint}
         />
+
+        {props.cinematicPlan && (
+          <CinematicSection
+            params={props.params}
+            plan={props.cinematicPlan}
+            set={props.set}
+            commit={props.commit}
+            busy={props.busy}
+            actionMessage={props.cinematicActionMessage}
+            onAddShotPack={props.onAddCinematicShotPack}
+            onExportShotPack={props.onExportCinematicShotPack}
+            onExportChecklist={props.onExportCinematicChecklist}
+          />
+        )}
 
         <PositionSection
           params={props.params}

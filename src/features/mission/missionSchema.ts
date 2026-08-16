@@ -49,7 +49,8 @@ export interface LoadedWorkspace {
 
 export const LIBRARY_KEY = "atom-mission-library";
 export const WORKSPACE_KEY = "atom-mission-workspace";
-export const WORKSPACE_VERSION = 1;
+export const WORKSPACE_VERSION = 2;
+const LEGACY_WORKSPACE_VERSION = 1;
 
 export const PALETTE = [
   "#22d3ee",
@@ -91,6 +92,13 @@ const BOUNDS = {
   passSpacingM: [0.5, 5_000],
   startRadiusM: [0, 5_000],
   turns: [0, 50],
+  cinematicViewIndex: [0, 7],
+  buildingWidthM: [1, 20_000],
+  buildingDepthM: [1, 20_000],
+  buildingClearanceM: [1, 5_000],
+  cinematicShotLengthM: [1, 20_000],
+  cinematicLeadInM: [0, 5_000],
+  cinematicTargetHeightM: [0, 10_000],
 } as const satisfies Record<string, readonly [number, number]>;
 
 const FORM_KINDS: readonly FormKind[] = [
@@ -100,10 +108,25 @@ const FORM_KINDS: readonly FormKind[] = [
   "grid",
   "spiral",
   "star",
+  "cinematic",
   "manual",
 ];
 
 const FORM_PARAM_KEYS = Object.keys(DEFAULT_FORM_PARAMS);
+const CINEMATIC_PARAM_KEYS: readonly (keyof FormParams)[] = [
+  "cinematicMode",
+  "cinematicViewCount",
+  "cinematicViewIndex",
+  "buildingWidthM",
+  "buildingDepthM",
+  "buildingClearanceM",
+  "cinematicShotLengthM",
+  "cinematicLeadInM",
+  "cinematicTargetHeightM",
+];
+const LEGACY_FORM_PARAM_KEYS = FORM_PARAM_KEYS.filter(
+  (key) => !CINEMATIC_PARAM_KEYS.includes(key as keyof FormParams),
+);
 const FORM_NUMBER_KEYS: readonly (keyof FormParams)[] = [
   "radiusM",
   "headingDeg",
@@ -117,6 +140,14 @@ const FORM_NUMBER_KEYS: readonly (keyof FormParams)[] = [
   "passSpacingM",
   "startRadiusM",
   "turns",
+  "cinematicViewCount",
+  "cinematicViewIndex",
+  "buildingWidthM",
+  "buildingDepthM",
+  "buildingClearanceM",
+  "cinematicShotLengthM",
+  "cinematicLeadInM",
+  "cinematicTargetHeightM",
 ];
 const WORKSPACE_KEYS: readonly (keyof Workspace)[] = [
   "params",
@@ -137,6 +168,9 @@ const WORKSPACE_NUMBER_KEYS: readonly (keyof Workspace)[] = [
   "reservePct",
   "geofenceM",
 ];
+const LEGACY_FORM_NUMBER_KEYS = FORM_NUMBER_KEYS.filter(
+  (key) => !CINEMATIC_PARAM_KEYS.includes(key),
+);
 
 export const MAX_TEXT_LENGTH = 200;
 const MAX_NAME_LENGTH = MAX_TEXT_LENGTH;
@@ -188,8 +222,11 @@ function isCanonicalWaypoint(value: unknown): boolean {
 
 function isLosslessWorkspace(raw: Record<string, unknown>, parsed: Workspace): boolean {
   const params = record(raw.params);
+  const isLegacy = raw.v === LEGACY_WORKSPACE_VERSION;
+  const requiredParamKeys = isLegacy ? LEGACY_FORM_PARAM_KEYS : FORM_PARAM_KEYS;
+  const requiredNumberKeys = isLegacy ? LEGACY_FORM_NUMBER_KEYS : FORM_NUMBER_KEYS;
   if (
-    raw.v !== WORKSPACE_VERSION ||
+    (raw.v !== WORKSPACE_VERSION && !isLegacy) ||
     !hasFields(raw, WORKSPACE_KEYS) ||
     (raw.editingId !== null &&
       (typeof raw.editingId !== "string" || raw.editingId.length > MAX_NAME_LENGTH)) ||
@@ -198,10 +235,11 @@ function isLosslessWorkspace(raw: Record<string, unknown>, parsed: Workspace): b
     !hasFiniteNumbers(raw, WORKSPACE_NUMBER_KEYS) ||
     WORKSPACE_NUMBER_KEYS.some((key) => raw[key] !== parsed[key]) ||
     !params ||
-    !hasFields(params, FORM_PARAM_KEYS) ||
-    !hasFiniteNumbers(params, FORM_NUMBER_KEYS) ||
+    !hasFields(params, requiredParamKeys) ||
+    !hasFiniteNumbers(params, requiredNumberKeys) ||
     params.kind !== parsed.params.kind ||
-    FORM_NUMBER_KEYS.some((key) => params[key] !== parsed.params[key]) ||
+    requiredNumberKeys.some((key) => params[key] !== parsed.params[key]) ||
+    (!isLegacy && params.cinematicMode !== parsed.params.cinematicMode) ||
     !isCanonicalWaypoint(params.center) ||
     !Array.isArray(params.manual) ||
     params.manual.length > ATOM_LIMITS.maxWaypointsPerMission ||
@@ -271,6 +309,29 @@ export function parseFormParams(value: unknown): FormParams {
     passSpacingM: num(p.passSpacingM, d.passSpacingM, BOUNDS.passSpacingM),
     startRadiusM: num(p.startRadiusM, d.startRadiusM, BOUNDS.startRadiusM),
     turns: num(p.turns, d.turns, BOUNDS.turns),
+    cinematicMode:
+      p.cinematicMode === "shots" || p.cinematicMode === "route"
+        ? p.cinematicMode
+        : d.cinematicMode,
+    cinematicViewCount:
+      p.cinematicViewCount === 4 || p.cinematicViewCount === 8
+        ? p.cinematicViewCount
+        : d.cinematicViewCount,
+    cinematicViewIndex: int(p.cinematicViewIndex, d.cinematicViewIndex, BOUNDS.cinematicViewIndex),
+    buildingWidthM: num(p.buildingWidthM, d.buildingWidthM, BOUNDS.buildingWidthM),
+    buildingDepthM: num(p.buildingDepthM, d.buildingDepthM, BOUNDS.buildingDepthM),
+    buildingClearanceM: num(p.buildingClearanceM, d.buildingClearanceM, BOUNDS.buildingClearanceM),
+    cinematicShotLengthM: num(
+      p.cinematicShotLengthM,
+      d.cinematicShotLengthM,
+      BOUNDS.cinematicShotLengthM,
+    ),
+    cinematicLeadInM: num(p.cinematicLeadInM, d.cinematicLeadInM, BOUNDS.cinematicLeadInM),
+    cinematicTargetHeightM: num(
+      p.cinematicTargetHeightM,
+      d.cinematicTargetHeightM,
+      BOUNDS.cinematicTargetHeightM,
+    ),
     manual: parseWaypoints(p.manual),
   };
 }
@@ -329,7 +390,7 @@ export function parseLibrary(value: unknown): SavedMission[] {
 
 export function parseWorkspace(value: unknown): Workspace {
   const ws = record(value);
-  if (ws?.v !== WORKSPACE_VERSION) return DEFAULT_WORKSPACE;
+  if (ws?.v !== WORKSPACE_VERSION && ws?.v !== LEGACY_WORKSPACE_VERSION) return DEFAULT_WORKSPACE;
   const d = DEFAULT_WORKSPACE;
   const parsed: Workspace = {
     params: parseFormParams(ws.params),

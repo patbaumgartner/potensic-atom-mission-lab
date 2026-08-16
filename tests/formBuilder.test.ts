@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildForm, DEFAULT_FORM_PARAMS, type FormKind } from "../src/features/mission/formBuilder";
 
-const kinds: FormKind[] = ["line", "polygon", "circle", "grid", "spiral", "star"];
+const kinds: FormKind[] = ["line", "polygon", "circle", "grid", "spiral", "star", "cinematic"];
 
 describe("buildForm", () => {
   it.each(kinds)("builds non-empty finite waypoints for %s", (kind) => {
@@ -39,5 +39,30 @@ describe("buildForm", () => {
       spacingM: 30,
     });
     expect(wps.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("cinematic shot mode builds the selected two-point view", () => {
+    const first = buildForm({
+      ...DEFAULT_FORM_PARAMS,
+      kind: "cinematic",
+      cinematicViewIndex: 0,
+    });
+    const last = buildForm({
+      ...DEFAULT_FORM_PARAMS,
+      kind: "cinematic",
+      cinematicViewIndex: 99,
+    });
+    expect(first).toHaveLength(2);
+    expect(last).toHaveLength(2);
+    expect(last).not.toEqual(first);
+  });
+
+  it("cinematic route mode builds a connected repositioning route", () => {
+    const waypoints = buildForm({
+      ...DEFAULT_FORM_PARAMS,
+      kind: "cinematic",
+      cinematicMode: "route",
+    });
+    expect(waypoints.length).toBeGreaterThan(16);
   });
 });

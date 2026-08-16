@@ -3,6 +3,12 @@ import { useEffect, useRef } from "react";
 import { bearingDeg, destinationPoint, haversineMeters } from "./geometry";
 import type { Waypoint } from "./missionTypes";
 
+interface CinematicMapGuides {
+  footprint: Waypoint[];
+  safetyEnvelope: Waypoint[];
+  filmingPaths: Waypoint[][];
+}
+
 interface MapViewProps {
   center: Waypoint;
   waypoints: Waypoint[];
@@ -23,6 +29,8 @@ interface MapViewProps {
   actualTrack: Waypoint[] | null;
   /** Other stored missions to render dimmed beneath the active one. */
   others?: { points: Waypoint[]; color: string }[];
+  /** Cinematic subject, clearance, and camera-useful path overlays. */
+  cinematicGuides?: CinematicMapGuides | null;
   /** Increment to fit the map to all missions (active + others). */
   fitAllSignal?: number;
   /** A coordinate to fly the map to (e.g. a search result). */
@@ -89,6 +97,7 @@ export function MapView({
   onWaypointDrag,
   actualTrack,
   others = [],
+  cinematicGuides = null,
   fitAllSignal = 0,
   flyCenter = null,
   flySignal = 0,
@@ -101,6 +110,7 @@ export function MapView({
   // Three independent layer groups so each redraws only on its own deps.
   const missionLayerRef = useRef<L.LayerGroup | null>(null);
   const othersLayerRef = useRef<L.LayerGroup | null>(null);
+  const guidesLayerRef = useRef<L.LayerGroup | null>(null);
   const trackLayerRef = useRef<L.LayerGroup | null>(null);
   const clickRef = useRef(onMapClick);
   // Stable refs that always hold the latest callback/value without re-binding event listeners.
@@ -149,8 +159,9 @@ export function MapView({
     map.on("click", (e: L.LeafletMouseEvent) => {
       clickRef.current({ lat: e.latlng.lat, lng: e.latlng.lng });
     });
-    // Layer order: others (bottom) → track → mission (top)
+    // Layer order: others (bottom) -> cinematic guides -> track -> mission (top)
     othersLayerRef.current = L.layerGroup().addTo(map);
+    guidesLayerRef.current = L.layerGroup().addTo(map);
     trackLayerRef.current = L.layerGroup().addTo(map);
     missionLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
@@ -191,6 +202,42 @@ export function MapView({
       }
     }
   }, [others]);
+
+  useEffect(() => {
+    const layer = guidesLayerRef.current;
+    if (!layer) return;
+    layer.clearLayers();
+    if (!cinematicGuides) return;
+
+    if (cinematicGuides.safetyEnvelope.length > 1) {
+      L.polyline(
+        cinematicGuides.safetyEnvelope.map(
+          (waypoint) => [waypoint.lat, waypoint.lng] as [number, number],
+        ),
+        { color: "#fbbf24", weight: 2, opacity: 0.9, dashArray: "7 6" },
+      ).addTo(layer);
+    }
+    if (cinematicGuides.footprint.length > 2) {
+      L.polygon(
+        cinematicGuides.footprint.map(
+          (waypoint) => [waypoint.lat, waypoint.lng] as [number, number],
+        ),
+        {
+          color: "#fb7185",
+          weight: 2,
+          fillColor: "#fb7185",
+          fillOpacity: 0.16,
+        },
+      ).addTo(layer);
+    }
+    for (const path of cinematicGuides.filmingPaths) {
+      if (path.length < 2) continue;
+      L.polyline(
+        path.map((waypoint) => [waypoint.lat, waypoint.lng] as [number, number]),
+        { color: "#34d399", weight: 5, opacity: 0.9, lineCap: "round" },
+      ).addTo(layer);
+    }
+  }, [cinematicGuides]);
 
   // Redraw the actual-track overlay only when `actualTrack` changes.
   useEffect(() => {
@@ -295,8 +342,14 @@ export function MapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (waypoints.length >= 2) {
-      map.fitBounds(L.latLngBounds(waypoints.map((w) => [w.lat, w.lng] as [number, number])), {
+    const fitPoints = [
+      ...waypoints,
+      ...(cinematicGuides?.footprint ?? []),
+      ...(cinematicGuides?.safetyEnvelope ?? []),
+      ...(cinematicGuides?.filmingPaths.flat() ?? []),
+    ];
+    if (fitPoints.length >= 2) {
+      map.fitBounds(L.latLngBounds(fitPoints.map((w) => [w.lat, w.lng] as [number, number])), {
         padding: [48, 48],
         maxZoom: 19,
       });
@@ -313,6 +366,12 @@ export function MapView({
     const all: [number, number][] = [
       ...waypoints.map((w) => [w.lat, w.lng] as [number, number]),
       ...others.flatMap((o) => o.points.map((w) => [w.lat, w.lng] as [number, number])),
+      ...(cinematicGuides?.footprint ?? []).map(
+        (waypoint) => [waypoint.lat, waypoint.lng] as [number, number],
+      ),
+      ...(cinematicGuides?.safetyEnvelope ?? []).map(
+        (waypoint) => [waypoint.lat, waypoint.lng] as [number, number],
+      ),
     ];
     if (all.length >= 2) {
       map.fitBounds(L.latLngBounds(all), { padding: [48, 48], maxZoom: 19 });

@@ -8,6 +8,7 @@ const FORMS: { kind: FormKind; label: string; glyph: string }[] = [
   { kind: "grid", label: "Grid", glyph: "▦" },
   { kind: "spiral", label: "Spiral", glyph: "◎" },
   { kind: "star", label: "Star", glyph: "★" },
+  { kind: "cinematic", label: "Cinematic", glyph: "⌾" },
   { kind: "manual", label: "Manual", glyph: "✎" },
 ];
 

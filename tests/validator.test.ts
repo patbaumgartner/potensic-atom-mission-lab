@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { generateCinematicPlan } from "../src/features/mission/cinematic";
+import { DEFAULT_FORM_PARAMS } from "../src/features/mission/formBuilder";
 import { circleForm, destinationPoint } from "../src/features/mission/geometry";
 import type { Mission, Waypoint } from "../src/features/mission/missionTypes";
-import { hasBlockingErrors, validateMission } from "../src/features/mission/validator";
+import {
+  hasBlockingErrors,
+  validateCinematicPlan,
+  validateMission,
+} from "../src/features/mission/validator";
 
 const ORIGIN: Waypoint = { lat: 47.415, lng: 9.395 };
 
@@ -70,5 +76,62 @@ describe("validateMission", () => {
     const wps = circleForm(ORIGIN, 100, 42);
     const issues = validateMission(mission({ waypoints: wps }));
     expect(issues.some((i) => i.code === "near-cap")).toBe(true);
+  });
+});
+
+describe("validateCinematicPlan", () => {
+  const cinematicParams = { ...DEFAULT_FORM_PARAMS, center: ORIGIN };
+  const plan = generateCinematicPlan({
+    center: ORIGIN,
+    frontBearingDeg: 0,
+    viewCount: 8,
+    buildingWidthM: 20,
+    buildingDepthM: 15,
+    clearanceM: 20,
+    shotLengthM: 30,
+    leadInM: 10,
+    flightAltitudeM: 25,
+    targetHeightM: 5,
+  });
+
+  it("accepts a normal cinematic plan", () => {
+    expect(validateCinematicPlan(cinematicParams, plan, 8, 25)).toEqual([]);
+  });
+
+  it("reports invalid geometry, framing, and library capacity", () => {
+    const issues = validateCinematicPlan(
+      {
+        ...cinematicParams,
+        buildingWidthM: 0,
+        buildingDepthM: 0,
+        buildingClearanceM: 0,
+        cinematicShotLengthM: 0,
+        cinematicLeadInM: -1,
+        cinematicTargetHeightM: 25,
+      },
+      plan,
+      0,
+      25,
+    );
+    expect(issues.map((issue) => issue.code)).toEqual([
+      "cinematic-footprint",
+      "cinematic-distances",
+      "cinematic-lead-in",
+      "cinematic-gimbal-up",
+      "cinematic-library-capacity",
+    ]);
+  });
+
+  it("detects route allocation and endpoint clearance violations", () => {
+    const invalidPlan: typeof plan = {
+      ...plan,
+      combinedRoute: Array.from({ length: 2_001 }, () => ORIGIN),
+      shots: plan.shots.map((shot, index) =>
+        index === 0 ? { ...shot, waypoints: [shot.waypoints[0], ORIGIN] } : shot,
+      ),
+    };
+    const issues = validateCinematicPlan(cinematicParams, invalidPlan, 8, 25);
+    expect(issues.some((issue) => issue.code === "cinematic-route-cap")).toBe(true);
+    expect(issues.some((issue) => issue.code === "cinematic-clearance")).toBe(true);
   });
 });

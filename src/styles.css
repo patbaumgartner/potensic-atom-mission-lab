@@ -277,6 +277,14 @@ button:disabled {
   gap: 9px;
 }
 
+.grid2 > * {
+  min-width: 0;
+}
+
+.grid2 input {
+  width: 100%;
+}
+
 .params-list {
   display: flex;
   flex-direction: column;
@@ -291,7 +299,8 @@ label {
   gap: 4px;
 }
 
-input {
+input,
+select {
   background: var(--field);
   border: 1px solid var(--border);
   color: var(--text);
@@ -303,10 +312,71 @@ input {
     box-shadow 0.15s ease;
 }
 
-input:focus {
+input:focus,
+select:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.segmented button {
+  padding: 7px 8px;
+  border-color: transparent;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.segmented button.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: var(--accent-2);
+}
+
+.cinematic-readout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin: 10px 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--border);
+}
+
+.cinematic-readout div {
+  min-width: 0;
+  padding: 8px;
+  background: var(--field);
+}
+
+.cinematic-readout dt {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.cinematic-readout dd {
+  margin: 3px 0 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.cinematic-actions {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
 }
 
 input[type="number"]::-webkit-inner-spin-button,
@@ -689,6 +759,26 @@ input[type="range"]::-webkit-slider-thumb {
 
 .map-drop svg {
   flex: none;
+}
+
+@media (max-width: 520px) {
+  .map-search {
+    width: calc(100% - 24px);
+    gap: 6px;
+    padding-left: 9px;
+  }
+
+  .map-search-go {
+    padding-inline: 10px;
+  }
+
+  .map-drop {
+    width: 34px;
+    justify-content: center;
+    gap: 0;
+    padding: 8px;
+    font-size: 0;
+  }
 }
 
 /* ── Single map notification toast (replaces map-hint / map-search-err / map-search-ok) ── */
