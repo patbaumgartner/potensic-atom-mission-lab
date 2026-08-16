@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { parseTrack } from "../src/features/logs/trackImport";
+import {
+  MAX_TRACK_FILE_BYTES,
+  MAX_TRACK_POINTS,
+  parseTrack,
+} from "../src/features/logs/trackImport";
 
 describe("track import", () => {
   it("parses a GPX track with trkpt/rtept/wpt", () => {
@@ -184,5 +188,21 @@ describe("track import", () => {
       coordinates: [[9.4, 47.4], "bad", [9.41]],
     });
     expect(parseTrack(geo, "a.json").points).toHaveLength(1);
+  });
+
+  it("rejects oversized files and point collections", () => {
+    expect(() => parseTrack("x".repeat(MAX_TRACK_FILE_BYTES + 1), "large.csv")).toThrow(
+      "Track file is too large",
+    );
+    const csv = Array.from(
+      { length: MAX_TRACK_POINTS + 1 },
+      (_, index) => `${index / 100},9.4`,
+    ).join("\n");
+    expect(() => parseTrack(csv, "many.csv")).toThrow(`Track exceeds ${MAX_TRACK_POINTS} points`);
+  });
+
+  it("drops coordinates outside WGS84 bounds", () => {
+    const csv = "lat,lng\n91,9\n47,180\n47,9";
+    expect(parseTrack(csv, "bounds.csv").points).toEqual([{ lat: 47, lng: 9 }]);
   });
 });

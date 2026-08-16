@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useTrackAnalysis } from "../src/hooks/useTrackAnalysis";
+import { MAX_TRACK_FILE_BYTES } from "../src/features/logs/trackImport";
 import type { Waypoint } from "../src/features/mission/missionTypes";
 
 const ORIGIN: Waypoint = { lat: 47.415, lng: 9.395 };
@@ -110,5 +111,19 @@ describe("useTrackAnalysis", () => {
     });
     expect(result.current.actualErr).toBe("Could not parse that track file.");
     expect(result.current.actual).toBeNull();
+  });
+
+  it("rejects oversized track files before reading them", async () => {
+    const { result } = renderHook(() => useTrackAnalysis([]));
+    const text = vi.fn(() => Promise.resolve("47.4,9.4"));
+    const file = { size: MAX_TRACK_FILE_BYTES + 1, text } as unknown as File;
+    const input = {
+      target: { files: [file], value: "" },
+    } as unknown as React.ChangeEvent<HTMLInputElement>;
+
+    await act(async () => result.current.onImportTrack(input));
+
+    expect(text).not.toHaveBeenCalled();
+    expect(result.current.actualErr).toContain("too large");
   });
 });

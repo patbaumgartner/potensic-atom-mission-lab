@@ -105,7 +105,7 @@ export function MapToolbar({
           className="map-drop"
           onClick={useMyLocation}
           disabled={isImported || geoLocBusy}
-          title="Place the mission center at your current GPS location"
+          title="Uses device GPS locally. Allow location access, then place the mission center here."
         >
           <svg
             width="16"

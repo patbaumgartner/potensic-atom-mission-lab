@@ -88,6 +88,21 @@ describe("downloads", () => {
     expect(click).toHaveBeenCalledTimes(1);
     click.mockRestore();
   });
+
+  it("sanitizes filenames at the download boundary", () => {
+    URL.createObjectURL = vi.fn(() => "blob:text");
+    const downloadedAs: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      downloadedAs.push(this.download);
+    });
+    downloadText("content", "../../unsafe:<name>?.txt");
+    downloadText("content", "\u0000\u007fsafe.txt");
+    downloadText("content", "...");
+    expect(downloadedAs).toEqual(["_.._unsafe__name__.txt", "__safe.txt", "download"]);
+    click.mockRestore();
+  });
 });
 
 describe("buildChecklist", () => {

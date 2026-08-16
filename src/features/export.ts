@@ -28,11 +28,25 @@ function triggerDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename;
+  a.download = sanitizeDownloadFilename(filename);
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function sanitizeDownloadFilename(filename: string): string {
+  const withoutControlCharacters = Array.from(filename, (character) => {
+    const codePoint = character.charCodeAt(0);
+    return codePoint <= 31 || codePoint === 127 ? "_" : character;
+  }).join("");
+  const sanitized = withoutControlCharacters
+    .replace(/[<>:"/\\|?*]/g, "_")
+    .replace(/^\.+/, "")
+    .replace(/[. ]+$/, "")
+    .trim()
+    .slice(0, 180);
+  return sanitized || "download";
 }
 
 /** Serialize the mission library + workspace state into a portable JSON blob. */
