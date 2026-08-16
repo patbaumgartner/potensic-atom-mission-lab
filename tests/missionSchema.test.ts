@@ -113,6 +113,7 @@ describe("parseFormParams", () => {
       startRadiusM: 5_000,
       turns: 0,
       cinematicMode: DEFAULT_FORM_PARAMS.cinematicMode,
+      cinematicPattern: DEFAULT_FORM_PARAMS.cinematicPattern,
       cinematicViewCount: DEFAULT_FORM_PARAMS.cinematicViewCount,
       cinematicViewIndex: DEFAULT_FORM_PARAMS.cinematicViewIndex,
       buildingWidthM: DEFAULT_FORM_PARAMS.buildingWidthM,
@@ -129,6 +130,7 @@ describe("parseFormParams", () => {
     const parsed = parseFormParams({
       kind: "cinematic",
       cinematicMode: "invalid",
+      cinematicPattern: "invalid",
       cinematicViewCount: 4,
       cinematicViewIndex: 99,
       buildingWidthM: 0,
@@ -139,7 +141,8 @@ describe("parseFormParams", () => {
       cinematicTargetHeightM: 20_000,
     });
     expect(parsed.kind).toBe("cinematic");
-    expect(parsed.cinematicMode).toBe("shots");
+    expect(parsed.cinematicMode).toBe("route");
+    expect(parsed.cinematicPattern).toBe("corners");
     expect(parsed.cinematicViewCount).toBe(4);
     expect(parsed.cinematicViewIndex).toBe(7);
     expect(parsed.buildingWidthM).toBe(1);
@@ -148,6 +151,10 @@ describe("parseFormParams", () => {
     expect(parsed.cinematicShotLengthM).toBe(20_000);
     expect(parsed.cinematicLeadInM).toBe(0);
     expect(parsed.cinematicTargetHeightM).toBe(10_000);
+
+    const hero = parseFormParams({ cinematicPattern: "hero", cinematicViewCount: 8 });
+    expect(hero.cinematicPattern).toBe("hero");
+    expect(hero.cinematicViewCount).toBe(3);
   });
 });
 
@@ -353,6 +360,7 @@ describe("persistence", () => {
     const legacyParams = { ...DEFAULT_FORM_PARAMS } as Record<string, unknown>;
     for (const key of [
       "cinematicMode",
+      "cinematicPattern",
       "cinematicViewCount",
       "cinematicViewIndex",
       "buildingWidthM",
@@ -369,6 +377,30 @@ describe("persistence", () => {
     });
     expect(loadWorkspaceState()).toEqual({
       workspace: DEFAULT_WORKSPACE,
+      persistenceBlocked: false,
+    });
+  });
+
+  it("migrates a lossless version-2 cinematic workspace", () => {
+    const previousParams = {
+      ...DEFAULT_FORM_PARAMS,
+      cinematicMode: "shots",
+      cinematicViewCount: 4,
+    } as Record<string, unknown>;
+    delete previousParams.cinematicPattern;
+    vi.stubGlobal("localStorage", {
+      getItem: () => JSON.stringify({ ...DEFAULT_WORKSPACE, v: 2, params: previousParams }),
+    });
+    expect(loadWorkspaceState()).toEqual({
+      workspace: {
+        ...DEFAULT_WORKSPACE,
+        params: {
+          ...DEFAULT_FORM_PARAMS,
+          cinematicMode: "shots",
+          cinematicPattern: "corners",
+          cinematicViewCount: 4,
+        },
+      },
       persistenceBlocked: false,
     });
   });

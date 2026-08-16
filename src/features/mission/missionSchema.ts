@@ -49,7 +49,8 @@ export interface LoadedWorkspace {
 
 export const LIBRARY_KEY = "atom-mission-library";
 export const WORKSPACE_KEY = "atom-mission-workspace";
-export const WORKSPACE_VERSION = 2;
+export const WORKSPACE_VERSION = 3;
+const PREVIOUS_WORKSPACE_VERSION = 2;
 const LEGACY_WORKSPACE_VERSION = 1;
 
 export const PALETTE = [
@@ -115,6 +116,7 @@ const FORM_KINDS: readonly FormKind[] = [
 const FORM_PARAM_KEYS = Object.keys(DEFAULT_FORM_PARAMS);
 const CINEMATIC_PARAM_KEYS: readonly (keyof FormParams)[] = [
   "cinematicMode",
+  "cinematicPattern",
   "cinematicViewCount",
   "cinematicViewIndex",
   "buildingWidthM",
@@ -127,6 +129,7 @@ const CINEMATIC_PARAM_KEYS: readonly (keyof FormParams)[] = [
 const LEGACY_FORM_PARAM_KEYS = FORM_PARAM_KEYS.filter(
   (key) => !CINEMATIC_PARAM_KEYS.includes(key as keyof FormParams),
 );
+const PREVIOUS_FORM_PARAM_KEYS = FORM_PARAM_KEYS.filter((key) => key !== "cinematicPattern");
 const FORM_NUMBER_KEYS: readonly (keyof FormParams)[] = [
   "radiusM",
   "headingDeg",
@@ -223,10 +226,15 @@ function isCanonicalWaypoint(value: unknown): boolean {
 function isLosslessWorkspace(raw: Record<string, unknown>, parsed: Workspace): boolean {
   const params = record(raw.params);
   const isLegacy = raw.v === LEGACY_WORKSPACE_VERSION;
-  const requiredParamKeys = isLegacy ? LEGACY_FORM_PARAM_KEYS : FORM_PARAM_KEYS;
+  const isPrevious = raw.v === PREVIOUS_WORKSPACE_VERSION;
+  const requiredParamKeys = isLegacy
+    ? LEGACY_FORM_PARAM_KEYS
+    : isPrevious
+      ? PREVIOUS_FORM_PARAM_KEYS
+      : FORM_PARAM_KEYS;
   const requiredNumberKeys = isLegacy ? LEGACY_FORM_NUMBER_KEYS : FORM_NUMBER_KEYS;
   if (
-    (raw.v !== WORKSPACE_VERSION && !isLegacy) ||
+    (raw.v !== WORKSPACE_VERSION && !isPrevious && !isLegacy) ||
     !hasFields(raw, WORKSPACE_KEYS) ||
     (raw.editingId !== null &&
       (typeof raw.editingId !== "string" || raw.editingId.length > MAX_NAME_LENGTH)) ||
@@ -240,6 +248,7 @@ function isLosslessWorkspace(raw: Record<string, unknown>, parsed: Workspace): b
     params.kind !== parsed.params.kind ||
     requiredNumberKeys.some((key) => params[key] !== parsed.params[key]) ||
     (!isLegacy && params.cinematicMode !== parsed.params.cinematicMode) ||
+    (!isLegacy && !isPrevious && params.cinematicPattern !== parsed.params.cinematicPattern) ||
     !isCanonicalWaypoint(params.center) ||
     !Array.isArray(params.manual) ||
     params.manual.length > ATOM_LIMITS.maxWaypointsPerMission ||
@@ -294,6 +303,15 @@ export function parseFormParams(value: unknown): FormParams {
   if (!p) return DEFAULT_FORM_PARAMS;
   const d = DEFAULT_FORM_PARAMS;
   const kind = FORM_KINDS.find((k) => k === p.kind) ?? d.kind;
+  const cinematicPattern =
+    p.cinematicPattern === "hero" ||
+    p.cinematicPattern === "corners" ||
+    p.cinematicPattern === "facades" ||
+    p.cinematicPattern === "full"
+      ? p.cinematicPattern
+      : p.cinematicViewCount === 4
+        ? "corners"
+        : d.cinematicPattern;
   return {
     kind,
     center: parseWaypoint(p.center) ?? d.center,
@@ -313,10 +331,8 @@ export function parseFormParams(value: unknown): FormParams {
       p.cinematicMode === "shots" || p.cinematicMode === "route"
         ? p.cinematicMode
         : d.cinematicMode,
-    cinematicViewCount:
-      p.cinematicViewCount === 4 || p.cinematicViewCount === 8
-        ? p.cinematicViewCount
-        : d.cinematicViewCount,
+    cinematicPattern,
+    cinematicViewCount: cinematicPattern === "hero" ? 3 : cinematicPattern === "full" ? 8 : 4,
     cinematicViewIndex: int(p.cinematicViewIndex, d.cinematicViewIndex, BOUNDS.cinematicViewIndex),
     buildingWidthM: num(p.buildingWidthM, d.buildingWidthM, BOUNDS.buildingWidthM),
     buildingDepthM: num(p.buildingDepthM, d.buildingDepthM, BOUNDS.buildingDepthM),
@@ -390,7 +406,13 @@ export function parseLibrary(value: unknown): SavedMission[] {
 
 export function parseWorkspace(value: unknown): Workspace {
   const ws = record(value);
-  if (ws?.v !== WORKSPACE_VERSION && ws?.v !== LEGACY_WORKSPACE_VERSION) return DEFAULT_WORKSPACE;
+  if (
+    ws?.v !== WORKSPACE_VERSION &&
+    ws?.v !== PREVIOUS_WORKSPACE_VERSION &&
+    ws?.v !== LEGACY_WORKSPACE_VERSION
+  ) {
+    return DEFAULT_WORKSPACE;
+  }
   const d = DEFAULT_WORKSPACE;
   const parsed: Workspace = {
     params: parseFormParams(ws.params),

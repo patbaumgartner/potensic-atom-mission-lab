@@ -27,10 +27,9 @@ live control-frame injection.
 
 - **Flight forms** — line, polygon, circle, survey grid (lawnmower), spiral,
   star, cinematic building shots, and free-hand manual paths.
-- **Cinematic house shots** — generate four corner views or eight façade/corner
-  reveal clips that fly straight toward a building, keeping a forward-facing
-  camera on the subject. Export the recommended independent shot pack or one
-  route with clearly separated repositioning legs.
+- **Cinematic house shots** — choose Hero front, Four corners, Four façades, or
+  Full coverage. Continuous Route exports the selected pattern as one playable
+  flight record; Separate Clips remains available for editing individual takes.
 - **Location search** — geocode any address/place, fly the map there, and show a
   concise Swiss-style address (`Street Nr, PLZ City`).
 - **Direct editing** — drag a resize handle to grow/shrink a form, a rotate
@@ -93,15 +92,21 @@ npm run generate:sample -- circle 30 12   # write fixtures/sample-map.db
 
 1. Put the mission center on the building and align **Rotate** with its front.
 2. Enter the approximate footprint and a conservative obstacle clearance.
-3. Choose **8 views** for four façades plus four corners, or **4 corners** for a
-   shorter shoot.
-4. Use **Shot pack** for the smoothest result: each exported mission is one
-   uninterrupted outer-to-inner line. Start recording manually and trim the
-   configured lead-in distance in post.
-5. **Single route** flies the same inward shots but adds outbound and outer-ring
-   repositioning legs. Those transitions are not intended as usable footage.
+3. Choose a pattern: **Hero front** for the front and both front corners,
+   **Four façades**, **Four corners**, or **Full coverage** for all eight views.
+4. **Continuous Route** is the practical default: it keeps every selected view
+   in one flight record and adds outbound and outer-ring repositioning legs.
+   Those transitions are not intended as usable footage.
+5. Use **Separate Clips** only when you explicitly want independent missions for
+   editing individual takes. Start recording manually and trim the configured
+   lead-in distance in post.
 6. Review the generated shot checklist and validate the route, framing, turns,
    RTH behavior, obstacles, and local airspace on site before flying.
+
+On phones, use the **Controls / Map** switch at the top. The map is hidden while
+scrolling controls so swipes cannot pan or tap it accidentally. A normal map tap
+does not move the mission center; use **Drop center** first (or Manual mode when
+intentionally adding waypoints).
 
 ## Project structure
 

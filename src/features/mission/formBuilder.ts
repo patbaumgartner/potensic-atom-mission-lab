@@ -2,6 +2,7 @@
 import {
   generateCinematicPlan,
   type CinematicMode,
+  type CinematicPattern,
   type CinematicPlan,
   type CinematicViewCount,
 } from "./cinematic";
@@ -42,6 +43,7 @@ export interface FormParams {
   turns: number;
   // cinematic building shots
   cinematicMode: CinematicMode;
+  cinematicPattern: CinematicPattern;
   cinematicViewCount: CinematicViewCount;
   cinematicViewIndex: number;
   buildingWidthM: number;
@@ -69,7 +71,8 @@ export const DEFAULT_FORM_PARAMS: FormParams = {
   passSpacingM: 12,
   startRadiusM: 5,
   turns: 3,
-  cinematicMode: "shots",
+  cinematicMode: "route",
+  cinematicPattern: "full",
   cinematicViewCount: 8,
   cinematicViewIndex: 0,
   buildingWidthM: 20,
@@ -85,7 +88,7 @@ export function buildCinematicPlanFromForm(p: FormParams, flightAltitudeM: numbe
   return generateCinematicPlan({
     center: p.center,
     frontBearingDeg: p.headingDeg,
-    viewCount: p.cinematicViewCount,
+    pattern: p.cinematicPattern,
     buildingWidthM: p.buildingWidthM,
     buildingDepthM: p.buildingDepthM,
     clearanceM: p.buildingClearanceM,

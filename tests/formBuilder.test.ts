@@ -45,11 +45,13 @@ describe("buildForm", () => {
     const first = buildForm({
       ...DEFAULT_FORM_PARAMS,
       kind: "cinematic",
+      cinematicMode: "shots",
       cinematicViewIndex: 0,
     });
     const last = buildForm({
       ...DEFAULT_FORM_PARAMS,
       kind: "cinematic",
+      cinematicMode: "shots",
       cinematicViewIndex: 99,
     });
     expect(first).toHaveLength(2);

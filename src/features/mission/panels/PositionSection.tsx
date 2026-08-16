@@ -51,8 +51,8 @@ export function PositionSection({
         Fit map to mission
       </button>
       <p className="hint">
-        Tip: search an address above, click the map to move the center, or drag the amber handle to
-        resize the form live.
+        Tip: search an address above or use Drop center before tapping the map. Drag the amber
+        handle to resize supported forms.
       </p>
     </section>
   );

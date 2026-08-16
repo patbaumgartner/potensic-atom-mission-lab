@@ -2,12 +2,13 @@ import { destinationPoint } from "./geometry";
 import { ATOM_LIMITS, type Waypoint } from "./missionTypes";
 
 export type CinematicMode = "shots" | "route";
-export type CinematicViewCount = 4 | 8;
+export type CinematicPattern = "hero" | "corners" | "facades" | "full";
+export type CinematicViewCount = 3 | 4 | 8;
 
 export interface CinematicParams {
   center: Waypoint;
   frontBearingDeg: number;
-  viewCount: CinematicViewCount;
+  pattern: CinematicPattern;
   buildingWidthM: number;
   buildingDepthM: number;
   clearanceM: number;
@@ -60,6 +61,33 @@ const VIEW_LABELS_4 = [
   "Front-left corner",
 ] as const;
 
+const VIEW_PATTERNS: Record<CinematicPattern, readonly { label: string; offsetDeg: number }[]> = {
+  hero: [
+    { label: "Front-left corner", offsetDeg: -45 },
+    { label: "Front", offsetDeg: 0 },
+    { label: "Front-right corner", offsetDeg: 45 },
+  ],
+  corners: VIEW_LABELS_4.map((label, index) => ({ label, offsetDeg: 45 + index * 90 })),
+  facades: [
+    { label: "Front", offsetDeg: 0 },
+    { label: "Right", offsetDeg: 90 },
+    { label: "Rear", offsetDeg: 180 },
+    { label: "Left", offsetDeg: 270 },
+  ],
+  full: VIEW_LABELS_8.map((label, index) => ({ label, offsetDeg: index * 45 })),
+};
+
+export const CINEMATIC_PATTERN_LABELS: Record<CinematicPattern, string> = {
+  hero: "Hero front (3 views)",
+  corners: "Four corners",
+  facades: "Four facades",
+  full: "Full coverage (8 views)",
+};
+
+export function cinematicPatternViewCount(pattern: CinematicPattern): CinematicViewCount {
+  return VIEW_PATTERNS[pattern].length as CinematicViewCount;
+}
+
 function normalizeBearing(degrees: number): number {
   return ((degrees % 360) + 360) % 360;
 }
@@ -82,14 +110,11 @@ export function cinematicSafetyRadius(params: {
 
 export function cinematicViewDefinitions(
   frontBearingDeg: number,
-  viewCount: CinematicViewCount,
+  pattern: CinematicPattern,
 ): { label: string; subjectBearingDeg: number }[] {
-  const labels = viewCount === 4 ? VIEW_LABELS_4 : VIEW_LABELS_8;
-  const startOffset = viewCount === 4 ? 45 : 0;
-  const step = 360 / viewCount;
-  return labels.map((label, index) => ({
-    label,
-    subjectBearingDeg: normalizeBearing(frontBearingDeg + startOffset + index * step),
+  return VIEW_PATTERNS[pattern].map((view) => ({
+    label: view.label,
+    subjectBearingDeg: normalizeBearing(frontBearingDeg + view.offsetDeg),
   }));
 }
 
@@ -168,7 +193,7 @@ export function generateCinematicPlan(params: CinematicParams): CinematicPlan {
   const safetyRadiusM = cinematicSafetyRadius(params);
   const filmingStartDistanceM = safetyRadiusM + params.shotLengthM;
   const stagingDistanceM = filmingStartDistanceM + params.leadInM;
-  const definitions = cinematicViewDefinitions(params.frontBearingDeg, params.viewCount);
+  const definitions = cinematicViewDefinitions(params.frontBearingDeg, params.pattern);
   const shots = definitions.map<CinematicShot>((definition, index) => {
     const staging = destinationPoint(params.center, definition.subjectBearingDeg, stagingDistanceM);
     const filmingStart = destinationPoint(

@@ -108,7 +108,7 @@ describe("buildChecklist", () => {
     const plan = generateCinematicPlan({
       center: { lat: 47.4, lng: 9.3 },
       frontBearingDeg: 0,
-      viewCount: 4,
+      pattern: "corners",
       buildingWidthM: 20,
       buildingDepthM: 15,
       clearanceM: 20,
