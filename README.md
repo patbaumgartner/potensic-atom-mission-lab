@@ -26,7 +26,11 @@ live control-frame injection.
 ## Features
 
 - **Flight forms** — line, polygon, circle, survey grid (lawnmower), spiral,
-  star, and free-hand manual paths.
+  star, cinematic building shots, and free-hand manual paths.
+- **Cinematic house shots** — generate four corner views or eight façade/corner
+  reveal clips that fly straight toward a building, keeping a forward-facing
+  camera on the subject. Export the recommended independent shot pack or one
+  route with clearly separated repositioning legs.
 - **Location search** — geocode any address/place, fly the map there, and show a
   concise Swiss-style address (`Street Nr, PLZ City`).
 - **Direct editing** — drag a resize handle to grow/shrink a form, a rotate
@@ -80,6 +84,24 @@ npm run generate:sample -- circle 30 12   # write fixtures/sample-map.db
   target altitude manually before starting. Height/speed are stored as mission
   metadata and appear in the generated field checklist.
 - Practical cap of ~45 waypoints per flight record; larger missions auto-chunk.
+- **Cinematic mode is advisory** — it calculates a fixed gimbal pitch and safe
+  2D stand-off geometry, but does not command yaw, gimbal, speed, altitude, or
+  recording. Confirm that the aircraft nose follows each leg and set the camera
+  manually before flight.
+
+### Cinematic real-estate workflow
+
+1. Put the mission center on the building and align **Rotate** with its front.
+2. Enter the approximate footprint and a conservative obstacle clearance.
+3. Choose **8 views** for four façades plus four corners, or **4 corners** for a
+   shorter shoot.
+4. Use **Shot pack** for the smoothest result: each exported mission is one
+   uninterrupted outer-to-inner line. Start recording manually and trim the
+   configured lead-in distance in post.
+5. **Single route** flies the same inward shots but adds outbound and outer-ring
+   repositioning legs. Those transitions are not intended as usable footage.
+6. Review the generated shot checklist and validate the route, framing, turns,
+   RTH behavior, obstacles, and local airspace on site before flying.
 
 ## Project structure
 

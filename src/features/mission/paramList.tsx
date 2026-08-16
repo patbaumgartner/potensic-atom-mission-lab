@@ -18,6 +18,12 @@ const PARAM_META: Record<
   passSpacingM: { label: "Pass spacing", min: 3, max: 40, step: 1, unit: " m" },
   startRadiusM: { label: "Start radius", min: 0, max: 100, step: 1, unit: " m" },
   turns: { label: "Turns", min: 1, max: 8, step: 1 },
+  buildingWidthM: { label: "Building width", min: 5, max: 200, step: 1, unit: " m" },
+  buildingDepthM: { label: "Building depth", min: 5, max: 200, step: 1, unit: " m" },
+  buildingClearanceM: { label: "Safety clearance", min: 5, max: 150, step: 1, unit: " m" },
+  cinematicShotLengthM: { label: "Filming distance", min: 10, max: 200, step: 5, unit: " m" },
+  cinematicLeadInM: { label: "Lead-in trim", min: 0, max: 100, step: 5, unit: " m" },
+  cinematicTargetHeightM: { label: "Target height", min: 0, max: 120, step: 1, unit: " m" },
 };
 
 export function renderParams(
@@ -54,6 +60,15 @@ export function renderParams(
       return [field("startRadiusM"), field("radiusM"), field("turns"), field("points")];
     case "star":
       return [field("radiusM"), field("innerRadiusM"), field("sides")];
+    case "cinematic":
+      return [
+        field("buildingWidthM"),
+        field("buildingDepthM"),
+        field("buildingClearanceM"),
+        field("cinematicShotLengthM"),
+        field("cinematicLeadInM"),
+        field("cinematicTargetHeightM"),
+      ];
     default:
       return null;
   }

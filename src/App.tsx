@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   buildChecklist,
+  buildCinematicChecklist,
   downloadBytes,
   downloadText,
   exportProjectJSON,
@@ -17,12 +18,19 @@ import {
   pathLengthMeters,
 } from "./features/mission/geometry";
 import { fmtDuration } from "./features/mission/format";
-import { buildForm, type FormKind, type FormParams } from "./features/mission/formBuilder";
+import {
+  buildCinematicPlanFromForm,
+  buildForm,
+  type FormKind,
+  type FormParams,
+} from "./features/mission/formBuilder";
 import { MapToolbar } from "./features/mission/MapToolbar";
 import { MapView } from "./features/mission/MapView";
 import {
   loadLibraryState,
   loadWorkspaceState,
+  MAX_TEXT_LENGTH,
+  PALETTE,
   parseProject,
   WORKSPACE_KEY,
   WORKSPACE_VERSION,
@@ -31,7 +39,11 @@ import {
 import { ATOM_LIMITS, type Mission } from "./features/mission/missionTypes";
 import { Sidebar } from "./features/mission/Sidebar";
 import { useMissionLibrary } from "./features/mission/useMissionLibrary";
-import { hasBlockingErrors, validateMission } from "./features/mission/validator";
+import {
+  hasBlockingErrors,
+  validateCinematicPlan,
+  validateMission,
+} from "./features/mission/validator";
 import { generateMapDb } from "./features/potensic/atomMapDb";
 import { loadSql } from "./features/potensic/sqlLoader";
 import { useLocationSearch } from "./hooks/useLocationSearch";
@@ -51,6 +63,7 @@ export default function App() {
   const [chunkSize, setChunkSize] = useState(initialWs.chunkSize);
   const [busy, setBusy] = useState(false);
   const [projectErr, setProjectErr] = useState<string | null>(null);
+  const [cinematicActionMessage, setCinematicActionMessage] = useState<string | null>(null);
   const [persistenceErr, setPersistenceErr] = useState<string | null>(() => {
     if (initialWorkspaceState.persistenceBlocked) {
       return "Stored workspace is corrupt; import a valid project before saving changes.";
@@ -90,7 +103,19 @@ export default function App() {
   });
   const { imported, importIndex, importName, setImported } = missionImport;
 
-  const formWaypoints = useMemo(() => buildForm(params), [params]);
+  const cinematicPlan = useMemo(
+    () => (params.kind === "cinematic" ? buildCinematicPlanFromForm(params, heightM) : null),
+    [params, heightM],
+  );
+  const formWaypoints = useMemo(() => {
+    if (!cinematicPlan) return buildForm(params);
+    if (params.cinematicMode === "route") return cinematicPlan.combinedRoute;
+    const index = Math.min(
+      cinematicPlan.shots.length - 1,
+      Math.max(0, Math.round(params.cinematicViewIndex)),
+    );
+    return [...cinematicPlan.shots[index].waypoints];
+  }, [params, cinematicPlan]);
   const isImported = imported !== null && imported.records.length > 0;
   const activeRecord = isImported
     ? imported?.records[Math.min(importIndex, (imported.records.length ?? 0) - 1)]
@@ -109,9 +134,18 @@ export default function App() {
     }),
     [activeName, waypoints, activeRecord, heightM, speedMs],
   );
+  const cinematicShotMissions = useMemo<Mission[]>(() => {
+    if (!cinematicPlan) return [];
+    const baseName = name.trim() || "Cinematic House";
+    return cinematicPlan.shots.map((shot) => ({
+      name: `${baseName} - ${shot.label}`.slice(0, MAX_TEXT_LENGTH),
+      waypoints: [...shot.waypoints],
+      plannedHeightM: heightM,
+      plannedSpeedMs: speedMs,
+    }));
+  }, [cinematicPlan, name, heightM, speedMs]);
 
-  const issues = useMemo(() => validateMission(mission), [mission]);
-  const blocked = hasBlockingErrors(issues);
+  const missionIssues = useMemo(() => validateMission(mission), [mission]);
 
   const distanceM = useMemo(() => pathLengthMeters(waypoints), [waypoints]);
   const durationS = useMemo(
@@ -157,6 +191,7 @@ export default function App() {
     editingId,
     setEditingId,
     addToLibrary,
+    addManyToLibrary,
     renameEntry,
     removeEntry,
     duplicateEntry,
@@ -184,6 +219,49 @@ export default function App() {
     bumpFit,
     onPersistenceError: setPersistenceErr,
   });
+  const cinematicOverlays = useMemo(() => {
+    if (!cinematicPlan || params.cinematicMode !== "shots") return [];
+    const selectedIndex = Math.min(cinematicPlan.shots.length - 1, params.cinematicViewIndex);
+    return cinematicPlan.shots
+      .filter((shot) => shot.index !== selectedIndex)
+      .map((shot) => ({
+        points: [...shot.waypoints],
+        color: PALETTE[shot.index % PALETTE.length],
+      }));
+  }, [cinematicPlan, params.cinematicMode, params.cinematicViewIndex]);
+  const mapOverlays = useMemo(
+    () => [...libraryOverlays, ...cinematicOverlays],
+    [libraryOverlays, cinematicOverlays],
+  );
+  const cinematicGuides = useMemo(() => {
+    if (!cinematicPlan) return null;
+    const selectedIndex = Math.min(cinematicPlan.shots.length - 1, params.cinematicViewIndex);
+    return {
+      footprint: cinematicPlan.footprint,
+      safetyEnvelope: cinematicPlan.safetyEnvelope,
+      filmingPaths:
+        params.cinematicMode === "route"
+          ? cinematicPlan.shots.map((shot) => [...shot.filmingPath])
+          : [[...cinematicPlan.shots[selectedIndex].filmingPath]],
+    };
+  }, [cinematicPlan, params.cinematicMode, params.cinematicViewIndex]);
+  const cinematicIssues = useMemo(
+    () =>
+      cinematicPlan
+        ? validateCinematicPlan(
+            params,
+            cinematicPlan,
+            ATOM_LIMITS.maxLibraryEntries - savedMissions.length,
+            heightM,
+          )
+        : [],
+    [params, cinematicPlan, savedMissions.length, heightM],
+  );
+  const issues = useMemo(
+    () => [...missionIssues, ...cinematicIssues],
+    [missionIssues, cinematicIssues],
+  );
+  const blocked = hasBlockingErrors(issues);
   // eslint-disable-next-line react-hooks/refs -- intentional latest-ref pattern, see comment above
   editingIdClearRef.current = () => setEditingId(null);
   const onRename = (id: string, nm: string) => {
@@ -344,6 +422,51 @@ export default function App() {
     }
   }
 
+  function addCinematicShotPack() {
+    const result = addManyToLibrary(cinematicShotMissions);
+    if (result.ok) {
+      setCinematicActionMessage(`Added ${result.count} independent shots to the mission library.`);
+      fitAll();
+      return;
+    }
+    const messages = {
+      empty: "No cinematic shots are available.",
+      invalid: "The shot pack contains invalid mission data.",
+      capacity: "The mission library does not have room for the complete shot pack.",
+      persistence: "The mission library is write-locked until a valid project is imported.",
+    } as const;
+    setCinematicActionMessage(messages[result.reason]);
+  }
+
+  async function exportCinematicShotPack() {
+    if (!cinematicPlan || cinematicShotMissions.length === 0) return;
+    setBusy(true);
+    setCinematicActionMessage(null);
+    try {
+      const SQL = await loadSql();
+      const bytes = generateMapDb(SQL, cinematicShotMissions, { chunkSize });
+      downloadBytes(bytes, "cinematic-shot-pack-map.db");
+      setCinematicActionMessage(`Exported ${cinematicShotMissions.length} independent shots.`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function exportCinematicChecklist() {
+    if (!cinematicPlan) return;
+    const slug = (name || "cinematic-house").replace(/[^a-z0-9_-]+/gi, "_");
+    downloadText(
+      buildCinematicChecklist(name || "Cinematic House", cinematicPlan, {
+        mode: params.cinematicMode,
+        plannedHeightM: heightM,
+        plannedSpeedMs: speedMs,
+        leadInM: params.cinematicLeadInM,
+      }),
+      `${slug}-shot-checklist.md`,
+      "text/markdown",
+    );
+  }
+
   async function exportEntry(e: SavedMission) {
     setBusy(true);
     try {
@@ -469,6 +592,11 @@ export default function App() {
         mirrorAcrossCenter={mirrorAcrossCenter}
         closeLoopPoints={closeLoopPoints}
         removeLastPoint={removeLastPoint}
+        cinematicPlan={cinematicPlan}
+        cinematicActionMessage={cinematicActionMessage}
+        onAddCinematicShotPack={addCinematicShotPack}
+        onExportCinematicShotPack={() => void exportCinematicShotPack()}
+        onExportCinematicChecklist={exportCinematicChecklist}
         name={name}
         setName={setName}
         chunkSize={chunkSize}
@@ -523,7 +651,8 @@ export default function App() {
           editable={editable}
           onWaypointDrag={onWaypointDrag}
           actualTrack={trackAnalysis.actual ? trackAnalysis.actual.points : null}
-          others={libraryOverlays}
+          others={mapOverlays}
+          cinematicGuides={cinematicGuides}
           fitAllSignal={fitAllSignal}
           flyCenter={locationSearch.flyCenter}
           flySignal={locationSearch.flySignal}

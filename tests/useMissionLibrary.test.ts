@@ -2,6 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { SavedMission } from "../src/features/mission/missionSchema";
+import { ATOM_LIMITS } from "../src/features/mission/missionTypes";
 import { useMissionLibrary } from "../src/features/mission/useMissionLibrary";
 
 const existing: SavedMission = {
@@ -50,6 +51,66 @@ describe("useMissionLibrary persistence lock", () => {
     expect(result.current.library).toEqual([]);
     expect(localStorage.getItem("atom-mission-library")).toBe(raw);
     expect(hookOptions.onPersistenceError).toHaveBeenCalledOnce();
+  });
+
+  it("adds a complete shot pack atomically and leaves editing clear", () => {
+    const { result } = renderHook(() => useMissionLibrary(options(false)));
+    const missions = Array.from({ length: 8 }, (_, index) => ({
+      name: `View ${index + 1}`,
+      waypoints: [{ lat: 47.4 + index / 1_000, lng: 9.3 }],
+      plannedHeightM: 20,
+      plannedSpeedMs: 3,
+    }));
+    let outcome: ReturnType<typeof result.current.addManyToLibrary> | undefined;
+
+    act(() => {
+      outcome = result.current.addManyToLibrary(missions);
+    });
+
+    expect(outcome).toEqual({ ok: true, count: 8 });
+    expect(result.current.library).toHaveLength(8);
+    expect(result.current.library.map((entry) => entry.name)).toEqual(
+      missions.map((mission) => mission.name),
+    );
+    expect(result.current.editingId).toBeNull();
+  });
+
+  it("does not partially add a pack when capacity is insufficient", () => {
+    const initialLibrary = Array.from(
+      { length: ATOM_LIMITS.maxLibraryEntries - 1 },
+      (_, index) => ({
+        ...existing,
+        id: `${index}`,
+      }),
+    );
+    const hookOptions = { ...options(false), initialLibrary };
+    const { result } = renderHook(() => useMissionLibrary(hookOptions));
+
+    let outcome: ReturnType<typeof result.current.addManyToLibrary> | undefined;
+    act(() => {
+      outcome = result.current.addManyToLibrary([
+        { ...existing, plannedHeightM: 20, plannedSpeedMs: 5 },
+        { ...existing, plannedHeightM: 20, plannedSpeedMs: 5 },
+      ]);
+    });
+
+    expect(outcome).toEqual({ ok: false, reason: "capacity" });
+    expect(result.current.library).toHaveLength(ATOM_LIMITS.maxLibraryEntries - 1);
+  });
+
+  it("does not partially add an invalid pack", () => {
+    const { result } = renderHook(() => useMissionLibrary(options(false)));
+
+    let outcome: ReturnType<typeof result.current.addManyToLibrary> | undefined;
+    act(() => {
+      outcome = result.current.addManyToLibrary([
+        { name: "Valid", waypoints: [{ lat: 1, lng: 2 }], plannedHeightM: 20, plannedSpeedMs: 5 },
+        { name: "Invalid", waypoints: [], plannedHeightM: 20, plannedSpeedMs: 5 },
+      ]);
+    });
+
+    expect(outcome).toEqual({ ok: false, reason: "invalid" });
+    expect(result.current.library).toEqual([]);
   });
 
   it("does not add missions with metadata outside the persisted domain", () => {

@@ -1,4 +1,5 @@
 // Export helpers: download a Uint8Array or text, and convert to GeoJSON.
+import type { CinematicMode, CinematicPlan } from "./mission/cinematic";
 import type { Mission, Waypoint } from "./mission/missionTypes";
 
 // Compact schema-maximum projects are ~24 MiB; leave headroom for UTF-8 names.
@@ -80,5 +81,46 @@ export function buildChecklist(mission: Mission, distanceM: number, chunks: numb
     "7. Start the mission; keep line of sight and controller override ready.",
     "8. Stop interval photos, return home, land.",
     "9. Pull logs and compare planned vs actual.",
+  ].join("\n");
+}
+
+export function buildCinematicChecklist(
+  name: string,
+  plan: CinematicPlan,
+  options: {
+    mode: CinematicMode;
+    plannedHeightM: number;
+    plannedSpeedMs: number;
+    leadInM: number;
+  },
+): string {
+  return [
+    `# Cinematic shot checklist — ${name}`,
+    "",
+    `- Output: ${options.mode === "shots" ? `${plan.shots.length} independent shots` : "single route with repositioning legs"}`,
+    `- Planned altitude: ${options.plannedHeightM} m (set manually)`,
+    `- Planned speed: ${options.plannedSpeedMs} m/s (confirm on controller)`,
+    `- Closest center distance: ${plan.safetyRadiusM.toFixed(1)} m`,
+    `- Starting distance: ${plan.stagingDistanceM.toFixed(1)} m`,
+    `- Fixed gimbal pitch: ${plan.gimbal.pitchDeg.toFixed(0)}°`,
+    `- Trim from each clip: first ${options.leadInM.toFixed(0)} m`,
+    "",
+    "## Views",
+    ...plan.shots.map(
+      (shot) =>
+        `${shot.index + 1}. ${shot.label}: start at ${shot.subjectBearingDeg.toFixed(0)}°, fly heading ${shot.flightBearingDeg.toFixed(0)}° toward the subject.`,
+    ),
+    "",
+    "## Field setup",
+    "1. Confirm the building footprint, clearance envelope, obstacles and legal airspace on site.",
+    "2. Climb to the planned altitude and set the fixed gimbal pitch manually.",
+    "3. Start recording manually before each filming leg; the mission does not command the camera.",
+    "4. Confirm the aircraft nose follows each straight leg and keep controller override ready.",
+    "5. Trim the lead-in footage in post.",
+    ...(options.mode === "route"
+      ? ["6. Do not use outbound or outer-ring repositioning legs as filming footage."]
+      : []),
+    "",
+    "No yaw, gimbal, altitude, speed or recording command is encoded per waypoint.",
   ].join("\n");
 }

@@ -1,5 +1,7 @@
 // Conservative Atom mission validation.
 
+import type { CinematicPlan } from "./cinematic";
+import type { FormParams } from "./formBuilder";
 import { haversineMeters } from "./geometry";
 import { ATOM_LIMITS, type Mission, type ValidationIssue } from "./missionTypes";
 
@@ -101,4 +103,68 @@ export function validateMission(mission: Mission): ValidationIssue[] {
 
 export function hasBlockingErrors(issues: ValidationIssue[]): boolean {
   return issues.some((i) => i.level === "error");
+}
+
+export function validateCinematicPlan(
+  params: FormParams,
+  plan: CinematicPlan,
+  availableLibrarySlots: number,
+  plannedHeightM: number,
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (params.buildingWidthM <= 0 || params.buildingDepthM <= 0) {
+    issues.push({
+      level: "error",
+      code: "cinematic-footprint",
+      message: "Building width and depth must both be greater than zero.",
+    });
+  }
+  if (params.buildingClearanceM <= 0 || params.cinematicShotLengthM <= 0) {
+    issues.push({
+      level: "error",
+      code: "cinematic-distances",
+      message: "Safety clearance and filming distance must both be greater than zero.",
+    });
+  }
+  if (params.cinematicLeadInM < 0) {
+    issues.push({
+      level: "error",
+      code: "cinematic-lead-in",
+      message: "Lead-in trim distance cannot be negative.",
+    });
+  }
+  if (params.cinematicTargetHeightM >= plannedHeightM) {
+    issues.push({
+      level: "warning",
+      code: "cinematic-gimbal-up",
+      message:
+        "The target is at or above camera altitude; fixed-gimbal framing may require upward tilt.",
+    });
+  }
+  if (availableLibrarySlots < plan.shots.length) {
+    issues.push({
+      level: "error",
+      code: "cinematic-library-capacity",
+      message: `The library needs ${plan.shots.length} free slots to add the complete shot pack.`,
+    });
+  }
+  if (plan.combinedRoute.length > ATOM_LIMITS.maxWaypointsPerMission) {
+    issues.push({
+      level: "error",
+      code: "cinematic-route-cap",
+      message: "The combined cinematic route exceeds the mission waypoint allocation limit.",
+    });
+  }
+  if (
+    plan.shots.some(
+      (shot) => haversineMeters(params.center, shot.waypoints[1]) < plan.safetyRadiusM - 0.1,
+    )
+  ) {
+    issues.push({
+      level: "error",
+      code: "cinematic-clearance",
+      message: "A filming endpoint falls inside the configured building clearance envelope.",
+    });
+  }
+  return issues;
 }

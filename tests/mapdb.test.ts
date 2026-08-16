@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { generateCinematicPlan } from "../src/features/mission/cinematic";
 import { circleForm, destinationPoint } from "../src/features/mission/geometry";
 import type { Mission, Waypoint } from "../src/features/mission/missionTypes";
 import {
@@ -232,5 +233,38 @@ describe("map.db generation", () => {
     db.close();
 
     expect(parseMapDb(SQL, bytes).records).toHaveLength(225);
+  });
+
+  it("round-trips a cinematic shot pack as independent flight records", async () => {
+    const SQL = await loadSqlNode();
+    const plan = generateCinematicPlan({
+      center: ORIGIN,
+      frontBearingDeg: 0,
+      viewCount: 8,
+      buildingWidthM: 20,
+      buildingDepthM: 15,
+      clearanceM: 20,
+      shotLengthM: 30,
+      leadInM: 10,
+      flightAltitudeM: 25,
+      targetHeightM: 5,
+    });
+    const missions = plan.shots.map((shot) => ({
+      name: `House - ${shot.label}`,
+      waypoints: [...shot.waypoints],
+      plannedHeightM: 25,
+      plannedSpeedMs: 3,
+    }));
+    const parsed = parseMapDb(SQL, generateMapDb(SQL, missions));
+
+    expect(parsed.records).toHaveLength(8);
+    expect(parsed.records.map((record) => record.label)).toEqual(
+      plan.shots.map((shot) => `House - ${shot.label}`),
+    );
+    parsed.records.forEach((record, index) => {
+      expect(record.waypoints).toHaveLength(2);
+      expect(record.waypoints[0].lat).toBeCloseTo(plan.shots[index].waypoints[0].lat, 9);
+      expect(record.waypoints[1].lng).toBeCloseTo(plan.shots[index].waypoints[1].lng, 9);
+    });
   });
 });

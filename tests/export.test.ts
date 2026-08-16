@@ -3,12 +3,14 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildChecklist,
+  buildCinematicChecklist,
   downloadBytes,
   downloadText,
   exportProjectJSON,
   MAX_PROJECT_FILE_BYTES,
   waypointsToGeoJSON,
 } from "../src/features/export";
+import { generateCinematicPlan } from "../src/features/mission/cinematic";
 import {
   DEFAULT_WORKSPACE,
   parseProject,
@@ -100,5 +102,40 @@ describe("buildChecklist", () => {
     expect(md).toContain("Path distance: 123 m");
     expect(md).toContain("Planned height: 20 m");
     expect(md).toContain("Planned speed: 5 m/s");
+  });
+
+  it("renders cinematic setup, views, and manual-control limitations", () => {
+    const plan = generateCinematicPlan({
+      center: { lat: 47.4, lng: 9.3 },
+      frontBearingDeg: 0,
+      viewCount: 4,
+      buildingWidthM: 20,
+      buildingDepthM: 15,
+      clearanceM: 20,
+      shotLengthM: 30,
+      leadInM: 10,
+      flightAltitudeM: 25,
+      targetHeightM: 5,
+    });
+    const checklist = buildCinematicChecklist("House", plan, {
+      mode: "route",
+      plannedHeightM: 25,
+      plannedSpeedMs: 3,
+      leadInM: 10,
+    });
+    expect(checklist).toContain("4. Front-left corner");
+    expect(checklist).toContain("Fixed gimbal pitch");
+    expect(checklist).toContain("repositioning legs");
+    expect(checklist).toContain("does not command the camera");
+    expect(checklist).toContain("No yaw, gimbal, altitude, speed or recording command");
+
+    const shotPack = buildCinematicChecklist("House", plan, {
+      mode: "shots",
+      plannedHeightM: 25,
+      plannedSpeedMs: 3,
+      leadInM: 10,
+    });
+    expect(shotPack).toContain("4 independent shots");
+    expect(shotPack).not.toContain("Do not use outbound");
   });
 });
