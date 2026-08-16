@@ -49,6 +49,12 @@ die() {
   exit 1
 }
 
+validate_package_name() {
+  local value="$1"
+  [[ "$value" =~ ^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$ ]] ||
+    die "invalid Android package name: $value"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --adb)
@@ -84,6 +90,8 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+validate_package_name "$PACKAGE"
 
 [[ -x "$ADB" ]] || die "ADB is not executable: $ADB"
 

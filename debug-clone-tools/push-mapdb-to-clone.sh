@@ -64,6 +64,12 @@ USAGE
 log() { printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
+validate_package_name() {
+  local value="$1"
+  [[ "$value" =~ ^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$ ]] ||
+    die "invalid Android package name: $value"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --map) MAP_FILE="${2:?missing value for --map}"; shift 2 ;;
@@ -80,6 +86,9 @@ while [[ $# -gt 0 ]]; do
     *) die "unknown argument: $1" ;;
   esac
 done
+
+validate_package_name "$PACKAGE"
+[[ "$WATCH_INTERVAL" =~ ^[1-9][0-9]*([.][0-9]+)?$ ]] || die "interval must be a positive number"
 
 [[ -x "$ADB" ]] || die "ADB is not executable: $ADB"
 
