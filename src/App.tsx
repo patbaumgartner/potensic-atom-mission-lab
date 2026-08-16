@@ -4,6 +4,7 @@ import {
   downloadBytes,
   downloadText,
   exportProjectJSON,
+  MAX_PROJECT_FILE_BYTES,
   waypointsToGeoJSON,
   type ProjectExport,
 } from "./features/export";
@@ -16,17 +17,20 @@ import {
   pathLengthMeters,
 } from "./features/mission/geometry";
 import { fmtDuration } from "./features/mission/format";
-import {
-  buildForm,
-  DEFAULT_FORM_PARAMS,
-  type FormKind,
-  type FormParams,
-} from "./features/mission/formBuilder";
+import { buildForm, type FormKind, type FormParams } from "./features/mission/formBuilder";
 import { MapToolbar } from "./features/mission/MapToolbar";
 import { MapView } from "./features/mission/MapView";
-import type { Mission } from "./features/mission/missionTypes";
+import {
+  loadLibraryState,
+  loadWorkspaceState,
+  parseProject,
+  WORKSPACE_KEY,
+  WORKSPACE_VERSION,
+  type SavedMission,
+} from "./features/mission/missionSchema";
+import { ATOM_LIMITS, type Mission } from "./features/mission/missionTypes";
 import { Sidebar } from "./features/mission/Sidebar";
-import { useMissionLibrary, type SavedMission } from "./features/mission/useMissionLibrary";
+import { useMissionLibrary } from "./features/mission/useMissionLibrary";
 import { hasBlockingErrors, validateMission } from "./features/mission/validator";
 import { generateMapDb } from "./features/potensic/atomMapDb";
 import { loadSql } from "./features/potensic/sqlLoader";
@@ -35,72 +39,40 @@ import { useMissionImport } from "./hooks/useMissionImport";
 import { useTrackAnalysis } from "./hooks/useTrackAnalysis";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 
-/** Type-guarding wrapper so callers get a narrowed `number` without a `!` assertion. */
-function isFiniteNumber(v: unknown): v is number {
-  return typeof v === "number" && Number.isFinite(v);
-}
-
-const WORKSPACE_KEY = "atom-mission-workspace";
-const WORKSPACE_VERSION = 1;
-
-interface Workspace {
-  v: number;
-  params: FormParams;
-  name: string;
-  heightM: number;
-  speedMs: number;
-  chunkSize: number;
-  batteryMin: number;
-  reservePct: number;
-  geofenceM: number;
-  editingId: string | null;
-}
-
-function loadWorkspace(): Partial<Workspace> {
-  try {
-    const raw = localStorage.getItem(WORKSPACE_KEY);
-    if (!raw) return {};
-    const data = JSON.parse(raw) as Partial<Workspace>;
-    // Discard state persisted by an incompatible older version.
-    // eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- explicit null guard for type safety
-    if (typeof data !== "object" || data === null || data.v !== WORKSPACE_VERSION) {
-      localStorage.removeItem(WORKSPACE_KEY);
-      return {};
-    }
-    // Validate numeric safety values so a corrupt entry cannot produce NaN.
-    if (
-      (data.heightM !== undefined && !Number.isFinite(data.heightM)) ||
-      (data.speedMs !== undefined && !Number.isFinite(data.speedMs)) ||
-      (data.batteryMin !== undefined && !Number.isFinite(data.batteryMin)) ||
-      (data.reservePct !== undefined && !Number.isFinite(data.reservePct)) ||
-      (data.geofenceM !== undefined && !Number.isFinite(data.geofenceM))
-    ) {
-      localStorage.removeItem(WORKSPACE_KEY);
-      return {};
-    }
-    return data;
-  } catch {
-    return {};
-  }
-}
-
 export default function App() {
-  const initialWs = useMemo(() => loadWorkspace(), []);
-  const [params, setParams] = useState<FormParams>(initialWs.params ?? DEFAULT_FORM_PARAMS);
-  const [name, setName] = useState(initialWs.name ?? "Mission");
-  const [heightM, setHeightM] = useState(initialWs.heightM ?? 20);
-  const [speedMs, setSpeedMs] = useState(initialWs.speedMs ?? 5);
-  const [chunkSize, setChunkSize] = useState(initialWs.chunkSize ?? 45);
+  const initialWorkspaceState = useMemo(() => loadWorkspaceState(), []);
+  const initialWs = initialWorkspaceState.workspace;
+  const initialLibraryState = useMemo(() => loadLibraryState(), []);
+  const initialLibrary = initialLibraryState.library;
+  const [params, setParams] = useState<FormParams>(initialWs.params);
+  const [name, setName] = useState(initialWs.name);
+  const [heightM, setHeightM] = useState(initialWs.heightM);
+  const [speedMs, setSpeedMs] = useState(initialWs.speedMs);
+  const [chunkSize, setChunkSize] = useState(initialWs.chunkSize);
   const [busy, setBusy] = useState(false);
+  const [projectErr, setProjectErr] = useState<string | null>(null);
+  const [persistenceErr, setPersistenceErr] = useState<string | null>(() => {
+    if (initialWorkspaceState.persistenceBlocked) {
+      return "Stored workspace is corrupt; import a valid project before saving changes.";
+    }
+    if (initialLibraryState.persistenceBlocked) {
+      return "Stored mission library is corrupt; import a valid project before changing the library.";
+    }
+    return null;
+  });
+  const [workspacePersistenceBlocked, setWorkspacePersistenceBlocked] = useState(
+    initialWorkspaceState.persistenceBlocked,
+  );
+  const [workspaceReplacementRevision, setWorkspaceReplacementRevision] = useState(0);
   const [fitSignal, setFitSignal] = useState(0);
   const bumpFit = () => setFitSignal((n) => n + 1);
   const [fitAllSignal, setFitAllSignal] = useState(0);
   const fitAll = () => setFitAllSignal((n) => n + 1);
 
   // Safety & battery (Atom packs are ~20 min).
-  const [batteryMin, setBatteryMin] = useState(initialWs.batteryMin ?? 20);
-  const [reservePct, setReservePct] = useState(initialWs.reservePct ?? 25);
-  const [geofenceM, setGeofenceM] = useState(initialWs.geofenceM ?? 150);
+  const [batteryMin, setBatteryMin] = useState(initialWs.batteryMin);
+  const [reservePct, setReservePct] = useState(initialWs.reservePct);
+  const [geofenceM, setGeofenceM] = useState(initialWs.geofenceM);
 
   // When on, the next map click drops the mission center instead of editing.
   const [dropCenterMode, setDropCenterMode] = useState(false);
@@ -181,7 +153,7 @@ export default function App() {
 
   const {
     library: savedMissions,
-    setLibrary,
+    replaceLibrary,
     editingId,
     setEditingId,
     addToLibrary,
@@ -192,7 +164,10 @@ export default function App() {
     libraryOverlays,
     libraryMissions,
   } = useMissionLibrary({
-    initialEditingId: initialWs.editingId ?? null,
+    initialLibrary,
+    initialPersistenceBlocked: initialLibraryState.persistenceBlocked,
+    initialEditingId: initialWs.editingId,
+    syncBaselineRevision: workspaceReplacementRevision,
     isImported,
     activeName,
     waypoints,
@@ -207,6 +182,7 @@ export default function App() {
     },
     commit,
     bumpFit,
+    onPersistenceError: setPersistenceErr,
   });
   // eslint-disable-next-line react-hooks/refs -- intentional latest-ref pattern, see comment above
   editingIdClearRef.current = () => setEditingId(null);
@@ -217,24 +193,56 @@ export default function App() {
 
   // Persist the whole working state so a reload restores everything.
   useEffect(() => {
-    const ws: Workspace = {
-      v: WORKSPACE_VERSION,
-      params,
-      name,
-      heightM,
-      speedMs,
-      chunkSize,
-      batteryMin,
-      reservePct,
-      geofenceM,
-      editingId,
-    };
-    try {
-      localStorage.setItem(WORKSPACE_KEY, JSON.stringify(ws));
-    } catch {
-      /* storage unavailable; keep in-memory only */
+    if (workspacePersistenceBlocked) return;
+    if (
+      workspaceReplacementRevision === 0 &&
+      params === initialWs.params &&
+      name === initialWs.name &&
+      heightM === initialWs.heightM &&
+      speedMs === initialWs.speedMs &&
+      chunkSize === initialWs.chunkSize &&
+      batteryMin === initialWs.batteryMin &&
+      reservePct === initialWs.reservePct &&
+      geofenceM === initialWs.geofenceM &&
+      editingId === initialWs.editingId
+    ) {
+      return;
     }
-  }, [params, name, heightM, speedMs, chunkSize, batteryMin, reservePct, geofenceM, editingId]);
+    try {
+      localStorage.setItem(
+        WORKSPACE_KEY,
+        JSON.stringify({
+          v: WORKSPACE_VERSION,
+          params,
+          name,
+          heightM,
+          speedMs,
+          chunkSize,
+          batteryMin,
+          reservePct,
+          geofenceM,
+          editingId,
+        }),
+      );
+    } catch {
+      queueMicrotask(() =>
+        setPersistenceErr("Browser storage is unavailable; recent changes are not saved."),
+      );
+    }
+  }, [
+    initialWs,
+    workspacePersistenceBlocked,
+    workspaceReplacementRevision,
+    params,
+    name,
+    heightM,
+    speedMs,
+    chunkSize,
+    batteryMin,
+    reservePct,
+    geofenceM,
+    editingId,
+  ]);
 
   // Map resize-handle wiring: which parameter the drag handle controls per form.
   let resizeSizeM: number | null = null;
@@ -266,6 +274,7 @@ export default function App() {
     }
     if (isImported) return;
     if (params.kind === "manual") {
+      if (params.manual.length >= ATOM_LIMITS.maxWaypointsPerMission) return;
       commit();
       set({ manual: [...params.manual, wp] });
     } else {
@@ -284,7 +293,11 @@ export default function App() {
 
   function editAsPoints() {
     commit();
-    setParams((prev) => ({ ...prev, kind: "manual", manual: waypoints }));
+    setParams((prev) => ({
+      ...prev,
+      kind: "manual",
+      manual: waypoints.slice(0, ATOM_LIMITS.maxWaypointsPerMission),
+    }));
     bumpFit();
   }
   function reversePoints() {
@@ -296,6 +309,12 @@ export default function App() {
     set({ manual: mirrorPoints(params.manual, params.center) });
   }
   function closeLoopPoints() {
+    if (params.manual.length >= ATOM_LIMITS.maxWaypointsPerMission) {
+      setProjectErr(
+        `Route already has ${ATOM_LIMITS.maxWaypointsPerMission} points; remove one before closing the loop.`,
+      );
+      return;
+    }
     commit();
     set({ manual: closeLoop(params.manual) });
   }
@@ -387,46 +406,35 @@ export default function App() {
   async function importProject(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setProjectErr(null);
     try {
-      const text = await file.text();
-      const data = JSON.parse(text) as { library?: unknown; workspace?: unknown };
-      if (Array.isArray(data.library)) {
-        const lib = (data.library as unknown[]).filter((item): item is SavedMission => {
-          if (typeof item !== "object" || item === null) return false;
-          const e2 = item as Record<string, unknown>;
-          return (
-            typeof e2.id === "string" &&
-            typeof e2.name === "string" &&
-            typeof e2.color === "string" &&
-            Array.isArray(e2.waypoints) &&
-            (e2.waypoints as unknown[]).every(
-              (w): boolean =>
-                typeof w === "object" &&
-                w !== null &&
-                Number.isFinite((w as Record<string, unknown>).lat) &&
-                Number.isFinite((w as Record<string, unknown>).lng),
-            ) &&
-            Number.isFinite(e2.plannedHeightM) &&
-            Number.isFinite(e2.plannedSpeedMs)
-          );
-        });
-        setLibrary(lib);
+      if (file.size > MAX_PROJECT_FILE_BYTES) {
+        setProjectErr("That project file is too large to import safely.");
+        return;
       }
-      const ws = data.workspace as Partial<Workspace> | undefined;
-      if (ws && typeof ws === "object") {
-        if (ws.params) setParams(ws.params);
-        if (typeof ws.name === "string") setName(ws.name);
-        if (isFiniteNumber(ws.heightM)) setHeightM(ws.heightM);
-        if (isFiniteNumber(ws.speedMs)) setSpeedMs(ws.speedMs);
-        if (isFiniteNumber(ws.chunkSize)) setChunkSize(ws.chunkSize);
-        if (isFiniteNumber(ws.batteryMin)) setBatteryMin(ws.batteryMin);
-        if (isFiniteNumber(ws.reservePct)) setReservePct(ws.reservePct);
-        if (isFiniteNumber(ws.geofenceM)) setGeofenceM(ws.geofenceM);
-        setEditingId(typeof ws.editingId === "string" ? ws.editingId : null);
+      const project = parseProject(JSON.parse(await file.text()));
+      if (!project) {
+        setProjectErr("That file is not an Atom Mission Lab project.");
+        return;
       }
+      const { library, workspace } = project;
+      replaceLibrary(library);
+      setWorkspacePersistenceBlocked(false);
+      setWorkspaceReplacementRevision((revision) => revision + 1);
+      setPersistenceErr(null);
+      setImported(null);
+      setParams(workspace.params);
+      setName(workspace.name);
+      setHeightM(workspace.heightM);
+      setSpeedMs(workspace.speedMs);
+      setChunkSize(workspace.chunkSize);
+      setBatteryMin(workspace.batteryMin);
+      setReservePct(workspace.reservePct);
+      setGeofenceM(workspace.geofenceM);
+      setEditingId(workspace.editingId);
       bumpFit();
     } catch {
-      /* silently ignore malformed project files */
+      setProjectErr("Could not read that project file (invalid JSON).");
     } finally {
       e.target.value = "";
     }
@@ -446,6 +454,8 @@ export default function App() {
         onExportChecklist={exportChecklist}
         onExportProject={exportProject}
         onImportProject={(e) => void importProject(e)}
+        projectErr={projectErr}
+        persistenceErr={persistenceErr}
         params={params}
         set={set}
         commit={commit}

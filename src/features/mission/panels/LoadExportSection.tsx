@@ -16,6 +16,8 @@ export function LoadExportSection({
   onExportChecklist,
   onExportProject,
   onImportProject,
+  projectErr,
+  persistenceErr,
 }: {
   missionImport: UseMissionImportReturn;
   isImported: boolean;
@@ -29,6 +31,8 @@ export function LoadExportSection({
   onExportChecklist: () => void;
   onExportProject: () => void;
   onImportProject: (e: ChangeEvent<HTMLInputElement>) => void;
+  projectErr: string | null;
+  persistenceErr: string | null;
 }) {
   const {
     imported,
@@ -117,6 +121,8 @@ export function LoadExportSection({
           <input type="file" accept=".json,application/json" onChange={onImportProject} hidden />
           Import project…
         </label>
+        {projectErr && <p className="err-line">{projectErr}</p>}
+        {persistenceErr && <p className="err-line">{persistenceErr}</p>}
       </section>
 
       <p className="hint">

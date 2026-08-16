@@ -79,8 +79,16 @@ export function estimateDurationSeconds(points: Waypoint[], speedMs: number): nu
  * would land within `minSpacingM` of the true end it is snapped onto it rather
  * than leaving a degenerate sub-metre leg the drone treats as a duplicate.
  */
-export function resamplePath(points: Waypoint[], spacingM: number): Waypoint[] {
+export function resamplePath(
+  points: Waypoint[],
+  spacingM: number,
+  maxPoints: number = ATOM_LIMITS.maxWaypointsPerMission,
+): Waypoint[] {
   if (points.length < 2 || !(spacingM > 0)) return [...points];
+  const budget = Math.max(2, Math.min(Math.floor(maxPoints), ATOM_LIMITS.maxWaypointsPerMission));
+  // Widen the spacing if the requested one would exceed the allocation ceiling,
+  // so an absurd value degrades the path's fidelity instead of hanging the tab.
+  const spacing = Math.max(spacingM, pathLengthMeters(points) / (budget - 1));
   const out: Waypoint[] = [points[0]];
   let carry = 0;
   for (let i = 1; i < points.length; i++) {
@@ -89,12 +97,12 @@ export function resamplePath(points: Waypoint[], spacingM: number): Waypoint[] {
     const segLen = haversineMeters(a, b);
     if (segLen === 0) continue;
     const brng = bearingDeg(a, b);
-    let distFromA = spacingM - carry;
-    while (distFromA < segLen) {
+    let distFromA = spacing - carry;
+    while (distFromA < segLen && out.length < budget - 1) {
       out.push(destinationPoint(a, brng, distFromA));
-      distFromA += spacingM;
+      distFromA += spacing;
     }
-    carry = segLen - (distFromA - spacingM);
+    carry = segLen - (distFromA - spacing);
   }
   const last = points[points.length - 1];
   const gap = haversineMeters(out[out.length - 1], last);
@@ -102,6 +110,16 @@ export function resamplePath(points: Waypoint[], spacingM: number): Waypoint[] {
   if (gap > ATOM_LIMITS.minSpacingM || out.length === 1) out.push(last);
   else out[out.length - 1] = last;
   return out;
+}
+
+/** Clamp a requested vertex count into a range no generator can overrun. */
+function vertexCount(
+  requested: number,
+  min: number,
+  max: number = ATOM_LIMITS.maxWaypointsPerMission,
+): number {
+  const n = Number.isFinite(requested) ? Math.round(requested) : min;
+  return Math.min(max, Math.max(min, n));
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +138,7 @@ export function polygonForm(
   sides: number,
   rotationDeg = 0,
 ): Waypoint[] {
-  const n = Math.max(3, Math.round(sides));
+  const n = vertexCount(sides, 3, ATOM_LIMITS.maxWaypointsPerMission - 1);
   const pts: Waypoint[] = [];
   for (let i = 0; i < n; i++) {
     const angle = rotationDeg + (360 / n) * i;
@@ -137,7 +155,7 @@ export function circleForm(
   points: number,
   rotationDeg = 0,
 ): Waypoint[] {
-  const n = Math.max(3, Math.round(points));
+  const n = vertexCount(points, 3, ATOM_LIMITS.maxWaypointsPerMission - 1);
   const pts: Waypoint[] = [];
   for (let i = 0; i < n; i++) {
     pts.push(destinationPoint(center, rotationDeg + (360 / n) * i, radiusM));
@@ -164,14 +182,22 @@ export function gridForm(params: {
   sampleSpacingM: number;
   headingDeg?: number;
 }): Waypoint[] {
-  const { center, sampleSpacingM } = params;
+  const { center } = params;
   const widthM = Math.max(0, params.widthM);
   const heightM = Math.max(0, params.heightM);
   const heading = params.headingDeg ?? 0;
   const across = heading + 90;
+  const maxIntervals = Math.floor(ATOM_LIMITS.maxWaypointsPerMission / 2) - 1;
   const intervals =
-    widthM > 0 && params.passSpacingM > 0 ? Math.ceil(widthM / params.passSpacingM) : 0;
+    widthM > 0 && params.passSpacingM > 0
+      ? Math.min(Math.ceil(widthM / params.passSpacingM), maxIntervals)
+      : 0;
   const passSpacingM = intervals > 0 ? widthM / intervals : 0;
+  // Share the mission-wide allocation ceiling across the passes, so a very fine
+  // sample spacing loses along-track fidelity instead of hanging the tab.
+  const passCount = intervals + 1;
+  const perPass = Math.max(2, Math.floor(ATOM_LIMITS.maxWaypointsPerMission / passCount));
+  const sampleSpacingM = Math.max(params.sampleSpacingM, heightM / (perPass - 1));
   // Start at the bottom-left corner of the rectangle.
   const halfLeft = destinationPoint(center, across + 180, widthM / 2);
   const corner = destinationPoint(halfLeft, heading + 180, heightM / 2);
@@ -180,7 +206,7 @@ export function gridForm(params: {
     const base = destinationPoint(corner, across, p * passSpacingM);
     const end = destinationPoint(base, heading, heightM);
     const leg = p % 2 === 0 ? [base, end] : [end, base];
-    for (const wp of resamplePath(leg, sampleSpacingM)) out.push(wp);
+    for (const wp of resamplePath(leg, sampleSpacingM, perPass)) out.push(wp);
   }
   return out;
 }
@@ -196,7 +222,7 @@ export function spiralForm(params: {
 }): Waypoint[] {
   const { center, startRadiusM, endRadiusM, turns, pointsPerTurn } = params;
   const rotation = params.rotationDeg ?? 0;
-  const totalPoints = Math.max(2, Math.round(turns * pointsPerTurn));
+  const totalPoints = vertexCount(turns * pointsPerTurn, 2, ATOM_LIMITS.maxWaypointsPerMission - 1);
   const out: Waypoint[] = [];
   for (let i = 0; i <= totalPoints; i++) {
     const t = i / totalPoints;
@@ -216,7 +242,8 @@ export function starForm(params: {
   rotationDeg?: number;
 }): Waypoint[] {
   const { center, outerRadiusM, innerRadiusM } = params;
-  const n = Math.max(3, Math.round(params.points));
+  const maxOuterPoints = Math.floor((ATOM_LIMITS.maxWaypointsPerMission - 1) / 2);
+  const n = vertexCount(params.points, 3, maxOuterPoints);
   const rotation = params.rotationDeg ?? 0;
   const out: Waypoint[] = [];
   for (let i = 0; i < n * 2; i++) {
@@ -303,11 +330,12 @@ export function mirrorPoints(points: Waypoint[], center: Waypoint): Waypoint[] {
   return points.map((p) => ({ lat: p.lat, lng: normalizeLongitude(2 * center.lng - p.lng) }));
 }
 
-/** Ensure a closed loop by appending the first point if needed. */
+/** Ensure a closed loop without exceeding the mission-wide allocation ceiling. */
 export function closeLoop(points: Waypoint[]): Waypoint[] {
   if (points.length < 3) return points;
   const first = points[0];
   const last = points[points.length - 1];
   if (haversineMeters(first, last) < 0.5) return points;
+  if (points.length >= ATOM_LIMITS.maxWaypointsPerMission) return points;
   return [...points, { ...first }];
 }

@@ -13,7 +13,7 @@ import { MetadataSection } from "./panels/MetadataSection";
 import { PositionSection } from "./panels/PositionSection";
 import { SafetySection } from "./panels/SafetySection";
 import { StatsAndValidationSection } from "./panels/StatsAndValidationSection";
-import type { SavedMission } from "./useMissionLibrary";
+import type { SavedMission } from "./missionSchema";
 
 export interface SidebarProps {
   missionImport: UseMissionImportReturn;
@@ -27,6 +27,8 @@ export interface SidebarProps {
   onExportChecklist: () => void;
   onExportProject: () => void;
   onImportProject: (e: ChangeEvent<HTMLInputElement>) => void;
+  projectErr: string | null;
+  persistenceErr: string | null;
 
   params: FormParams;
   set: (patch: Partial<FormParams>) => void;
@@ -109,6 +111,8 @@ export function Sidebar(props: SidebarProps) {
           onExportChecklist={props.onExportChecklist}
           onExportProject={props.onExportProject}
           onImportProject={props.onImportProject}
+          projectErr={props.projectErr}
+          persistenceErr={props.persistenceErr}
         />
 
         <FormSection

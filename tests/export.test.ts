@@ -6,17 +6,42 @@ import {
   downloadBytes,
   downloadText,
   exportProjectJSON,
+  MAX_PROJECT_FILE_BYTES,
   waypointsToGeoJSON,
 } from "../src/features/export";
+import {
+  DEFAULT_WORKSPACE,
+  parseProject,
+  WORKSPACE_VERSION,
+} from "../src/features/mission/missionSchema";
 
 describe("exportProjectJSON", () => {
   it("serialises library and workspace into valid JSON with an exportedAt timestamp", () => {
     const lib = [{ id: "1", name: "m" }];
     const ws = { v: 1, name: "Mission" };
-    const json = JSON.parse(exportProjectJSON({ library: lib, workspace: ws }));
+    const serialized = exportProjectJSON({ library: lib, workspace: ws });
+    const json = JSON.parse(serialized);
     expect(json.library).toEqual(lib);
     expect(json.workspace).toEqual(ws);
     expect(typeof json.exportedAt).toBe("string");
+    expect(serialized).not.toContain("\n");
+  });
+
+  it("keeps a schema-maximum compact project below the import limit", () => {
+    const waypoint = { lat: -89.99999999999999, lng: -179.99999999999997 };
+    const waypoints = Array.from({ length: 2_000 }, () => waypoint);
+    const library = Array.from({ length: 200 }, (_, index) => ({
+      id: `${index}`.padEnd(200, "x"),
+      name: "n".repeat(200),
+      color: "#".repeat(200),
+      waypoints,
+      plannedHeightM: 10_000,
+      plannedSpeedMs: 100,
+    }));
+    const workspace = { ...DEFAULT_WORKSPACE, v: WORKSPACE_VERSION };
+    const serialized = exportProjectJSON({ library, workspace });
+    expect(new Blob([serialized]).size).toBeLessThan(MAX_PROJECT_FILE_BYTES);
+    expect(parseProject(JSON.parse(serialized))).not.toBeNull();
   });
 });
 

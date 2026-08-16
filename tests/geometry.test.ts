@@ -71,6 +71,10 @@ describe("flight forms", () => {
     }
   });
 
+  it("uses the minimum vertex count for non-finite resolution", () => {
+    expect(circleForm(ORIGIN, 40, NaN)).toHaveLength(4);
+  });
+
   it("grid form covers multiple passes", () => {
     const pts = gridForm({
       center: ORIGIN,
@@ -80,6 +84,52 @@ describe("flight forms", () => {
       sampleSpacingM: 15,
     });
     expect(pts.length).toBeGreaterThan(10);
+  });
+});
+
+describe("form allocation ceilings", () => {
+  it("caps densely sampled lines while preserving both endpoints", () => {
+    const end = destinationPoint(ORIGIN, 45, 20_000);
+    const points = lineForm(ORIGIN, end, 0.01);
+    expect(points).toHaveLength(ATOM_LIMITS.maxWaypointsPerMission);
+    expect(points[0]).toBe(ORIGIN);
+    expect(haversineMeters(points[points.length - 1], end)).toBeCloseTo(0, 6);
+  });
+
+  it("reserves the closure point for polygons, circles, and stars", () => {
+    const closedForms = [
+      polygonForm(ORIGIN, 40, 1_000_000),
+      circleForm(ORIGIN, 40, 1_000_000),
+      starForm({
+        center: ORIGIN,
+        outerRadiusM: 40,
+        innerRadiusM: 20,
+        points: 1_000_000,
+      }),
+    ];
+    for (const points of closedForms) {
+      expect(points.length).toBeLessThanOrEqual(ATOM_LIMITS.maxWaypointsPerMission);
+      expect(points[points.length - 1]).toEqual(points[0]);
+    }
+  });
+
+  it("caps dense spirals and grids", () => {
+    const spiral = spiralForm({
+      center: ORIGIN,
+      startRadiusM: 1,
+      endRadiusM: 5_000,
+      turns: 1_000,
+      pointsPerTurn: 1_000,
+    });
+    const grid = gridForm({
+      center: ORIGIN,
+      widthM: 20_000,
+      heightM: 20_000,
+      passSpacingM: 0.5,
+      sampleSpacingM: 0.5,
+    });
+    expect(spiral).toHaveLength(ATOM_LIMITS.maxWaypointsPerMission);
+    expect(grid.length).toBeLessThanOrEqual(ATOM_LIMITS.maxWaypointsPerMission);
   });
 });
 
@@ -248,6 +298,15 @@ describe("more forms & measures", () => {
     expect(closeLoop([ORIGIN, ORIGIN])).toHaveLength(2);
     const closed = circleForm(ORIGIN, 20, 5);
     expect(closeLoop(closed)).toBe(closed);
+  });
+
+  it("closeLoop leaves a full-capacity route unchanged", () => {
+    const points = Array.from({ length: ATOM_LIMITS.maxWaypointsPerMission }, (_, index) =>
+      destinationPoint(ORIGIN, 90, index + 1),
+    );
+    const closed = closeLoop(points);
+    expect(closed).toBe(points);
+    expect(closed[closed.length - 1]).not.toEqual(closed[0]);
   });
 
   it("maxDistanceMeters and pathDeviation handle empty input", () => {

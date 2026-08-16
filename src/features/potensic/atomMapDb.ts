@@ -48,6 +48,20 @@ export interface ParsedMapDb {
   flightHistory: FlightHistoryEntry[];
 }
 
+export interface ParseMapDbLimits {
+  maxRecords: number;
+  maxWaypointsPerRecord: number;
+  maxTotalWaypoints: number;
+  maxFlightHistoryEntries: number;
+}
+
+export const DEFAULT_MAP_DB_PARSE_LIMITS: ParseMapDbLimits = {
+  maxRecords: 10_000,
+  maxWaypointsPerRecord: 2_000,
+  maxTotalWaypoints: 400_000,
+  maxFlightHistoryEntries: 100_000,
+};
+
 function applySchema(db: Database): void {
   db.run(`PRAGMA page_size = ${ATOM_PAGE_SIZE}`);
   db.run("PRAGMA encoding = 'UTF-8'");
@@ -115,14 +129,41 @@ function readLastRowId(db: Database): number {
   return Number(res[0].values[0][0]);
 }
 
+function rowCount(db: Database, table: string): number {
+  return Number(db.exec(`SELECT COUNT(*) FROM ${table}`)[0].values[0][0]);
+}
+
+function assertWithinParseLimits(db: Database, limits: ParseMapDbLimits): void {
+  if (rowCount(db, "flightrecordbean") > limits.maxRecords) {
+    throw new Error("map.db contains too many flight records");
+  }
+  if (rowCount(db, "multipointbean") > limits.maxTotalWaypoints) {
+    throw new Error("map.db contains too many waypoints");
+  }
+  const oversizedRecord = db.exec(
+    `SELECT 1 FROM multipointbean GROUP BY flightrecordbean_id HAVING COUNT(*) > ${limits.maxWaypointsPerRecord} LIMIT 1`,
+  );
+  if ((oversizedRecord[0]?.values.length ?? 0) > 0) {
+    throw new Error("map.db contains too many waypoints in one flight record");
+  }
+  if (rowCount(db, "flightnotes") > limits.maxFlightHistoryEntries) {
+    throw new Error("map.db contains too many flight history entries");
+  }
+}
+
 /** Parse a map.db back into flight records and waypoints (round-trip / inspector). */
-export function parseMapDb(SQL: SqlJsStatic, bytes: Uint8Array): ParsedMapDb {
+export function parseMapDb(
+  SQL: SqlJsStatic,
+  bytes: Uint8Array,
+  limits: ParseMapDbLimits = DEFAULT_MAP_DB_PARSE_LIMITS,
+): ParsedMapDb {
   const db = new SQL.Database(bytes);
   try {
     const userVersion = Number(db.exec("PRAGMA user_version")[0].values[0][0]);
     const tables = db
       .exec("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")[0]
       .values.map((r) => String(r[0]));
+    assertWithinParseLimits(db, limits);
 
     const records: ParsedFlightRecord[] = [];
     const recRes = db.exec(
