@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateCinematicPlan } from "../src/features/mission/cinematic";
+import { generateCinematicPlan, type CinematicPattern } from "../src/features/mission/cinematic";
 import { circleForm, destinationPoint } from "../src/features/mission/geometry";
 import type { Mission, Waypoint } from "../src/features/mission/missionTypes";
 import {
@@ -240,7 +240,7 @@ describe("map.db generation", () => {
     const plan = generateCinematicPlan({
       center: ORIGIN,
       frontBearingDeg: 0,
-      viewCount: 8,
+      pattern: "full",
       buildingWidthM: 20,
       buildingDepthM: 15,
       clearanceM: 20,
@@ -267,4 +267,40 @@ describe("map.db generation", () => {
       expect(record.waypoints[1].lng).toBeCloseTo(plan.shots[index].waypoints[1].lng, 9);
     });
   });
+
+  it.each(["hero", "corners", "facades", "full"] as CinematicPattern[])(
+    "round-trips the %s cinematic pattern as one continuous record",
+    async (pattern) => {
+      const SQL = await loadSqlNode();
+      const plan = generateCinematicPlan({
+        center: ORIGIN,
+        frontBearingDeg: 0,
+        pattern,
+        buildingWidthM: 20,
+        buildingDepthM: 15,
+        clearanceM: 20,
+        shotLengthM: 30,
+        leadInM: 10,
+        flightAltitudeM: 25,
+        targetHeightM: 5,
+      });
+      const parsed = parseMapDb(
+        SQL,
+        generateMapDb(
+          SQL,
+          [
+            {
+              name: `House - ${pattern}`,
+              waypoints: plan.combinedRoute,
+              plannedHeightM: 25,
+              plannedSpeedMs: 3,
+            },
+          ],
+          { chunkSize: 45 },
+        ),
+      );
+      expect(parsed.records).toHaveLength(1);
+      expect(parsed.records[0].waypoints).toHaveLength(plan.combinedRoute.length);
+    },
+  );
 });

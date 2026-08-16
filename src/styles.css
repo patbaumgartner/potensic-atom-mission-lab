@@ -46,13 +46,53 @@ body {
   height: 100vh;
 }
 
+.mobile-view-switch {
+  display: none;
+}
+
 /* Below tablet width the fixed 400px sidebar no longer fits next to a usable
    map: stack the panel above the map instead of clipping either one. */
 @media (max-width: 860px) {
   .layout {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 46vh) minmax(220px, 1fr);
-    height: 100vh;
+    display: block;
+    height: 100dvh;
+    padding-top: 50px;
+  }
+
+  .mobile-view-switch {
+    position: fixed;
+    z-index: 2000;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    height: 50px;
+    padding: 6px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-solid);
+  }
+
+  .mobile-view-switch button {
+    padding: 6px;
+    border-radius: 6px;
+  }
+
+  .mobile-view-switch button.active {
+    color: #fff;
+    border-color: transparent;
+    background: var(--grad);
+  }
+
+  .panel-wrap,
+  .map-wrap {
+    height: calc(100dvh - 50px);
+  }
+
+  .layout.mobile-controls .map-wrap,
+  .layout.mobile-map .panel-wrap {
+    display: none;
   }
 
   .panel {

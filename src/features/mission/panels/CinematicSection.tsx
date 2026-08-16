@@ -1,4 +1,9 @@
-import type { CinematicPlan, CinematicViewCount } from "../cinematic";
+import {
+  CINEMATIC_PATTERN_LABELS,
+  cinematicPatternViewCount,
+  type CinematicPattern,
+  type CinematicPlan,
+} from "../cinematic";
 import type { FormParams } from "../formBuilder";
 
 export function CinematicSection({
@@ -9,7 +14,6 @@ export function CinematicSection({
   busy,
   actionMessage,
   onAddShotPack,
-  onExportShotPack,
   onExportChecklist,
 }: {
   params: FormParams;
@@ -19,14 +23,17 @@ export function CinematicSection({
   busy: boolean;
   actionMessage: string | null;
   onAddShotPack: () => void;
-  onExportShotPack: () => void;
   onExportChecklist: () => void;
 }) {
   const selectedIndex = Math.min(plan.shots.length - 1, params.cinematicViewIndex);
   const selectedShot = plan.shots[selectedIndex];
-  const setViewCount = (count: CinematicViewCount) => {
+  const setPattern = (pattern: CinematicPattern) => {
     commit();
-    set({ cinematicViewCount: count, cinematicViewIndex: 0 });
+    set({
+      cinematicPattern: pattern,
+      cinematicViewCount: cinematicPatternViewCount(pattern),
+      cinematicViewIndex: 0,
+    });
   };
 
   return (
@@ -40,7 +47,7 @@ export function CinematicSection({
             set({ cinematicMode: "shots" });
           }}
         >
-          Shot pack
+          Separate clips
         </button>
         <button
           className={params.cinematicMode === "route" ? "active" : ""}
@@ -49,24 +56,23 @@ export function CinematicSection({
             set({ cinematicMode: "route" });
           }}
         >
-          Single route
+          Continuous route
         </button>
       </div>
 
-      <div className="segmented" aria-label="Cinematic view count">
-        <button
-          className={params.cinematicViewCount === 4 ? "active" : ""}
-          onClick={() => setViewCount(4)}
+      <label>
+        Pattern
+        <select
+          value={params.cinematicPattern}
+          onChange={(event) => setPattern(event.target.value as CinematicPattern)}
         >
-          4 corners
-        </button>
-        <button
-          className={params.cinematicViewCount === 8 ? "active" : ""}
-          onClick={() => setViewCount(8)}
-        >
-          8 views
-        </button>
-      </div>
+          {Object.entries(CINEMATIC_PATTERN_LABELS).map(([pattern, label]) => (
+            <option key={pattern} value={pattern}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {params.cinematicMode === "shots" && (
         <label>
@@ -101,23 +107,24 @@ export function CinematicSection({
           <dd>{plan.gimbal.pitchDeg.toFixed(0)}°</dd>
         </div>
         <div>
-          <dt>Selected view</dt>
-          <dd>{params.cinematicMode === "shots" ? selectedShot.label : "All views"}</dd>
+          <dt>{params.cinematicMode === "shots" ? "Selected view" : "Route points"}</dt>
+          <dd>
+            {params.cinematicMode === "shots" ? selectedShot.label : plan.combinedRoute.length}
+          </dd>
         </div>
       </dl>
 
       {plan.gimbal.warning && <p className="err-line">{plan.gimbal.warning}</p>}
       <p className="hint">
-        Set yaw, gimbal and recording manually before flight. Trim the lead-in; in single-route
+        Set yaw, gimbal and recording manually before flight. Trim the lead-in; in continuous-route
         mode, blue outbound and outer transitions are repositioning only.
       </p>
 
       <div className="cinematic-actions">
         <button className="primary" disabled={busy} onClick={onAddShotPack}>
-          Add all {plan.shots.length} shots
-        </button>
-        <button disabled={busy} onClick={onExportShotPack}>
-          Export shot pack map.db
+          {params.cinematicMode === "shots"
+            ? `Add all ${plan.shots.length} clips`
+            : "Add continuous route"}
         </button>
         <button onClick={onExportChecklist}>Shot checklist</button>
       </div>

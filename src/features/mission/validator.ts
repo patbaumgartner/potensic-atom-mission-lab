@@ -141,11 +141,12 @@ export function validateCinematicPlan(
         "The target is at or above camera altitude; fixed-gimbal framing may require upward tilt.",
     });
   }
-  if (availableLibrarySlots < plan.shots.length) {
+  const requiredLibrarySlots = params.cinematicMode === "route" ? 1 : plan.shots.length;
+  if (availableLibrarySlots < requiredLibrarySlots) {
     issues.push({
       level: "error",
       code: "cinematic-library-capacity",
-      message: `The library needs ${plan.shots.length} free slots to add the complete shot pack.`,
+      message: `The library needs ${requiredLibrarySlots} free slot${requiredLibrarySlots === 1 ? "" : "s"} for this cinematic output.`,
     });
   }
   if (plan.combinedRoute.length > ATOM_LIMITS.maxWaypointsPerMission) {

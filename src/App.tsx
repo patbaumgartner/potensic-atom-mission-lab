@@ -18,6 +18,7 @@ import {
   pathLengthMeters,
 } from "./features/mission/geometry";
 import { fmtDuration } from "./features/mission/format";
+import { CINEMATIC_PATTERN_LABELS } from "./features/mission/cinematic";
 import {
   buildCinematicPlanFromForm,
   buildForm,
@@ -89,6 +90,7 @@ export default function App() {
 
   // When on, the next map click drops the mission center instead of editing.
   const [dropCenterMode, setDropCenterMode] = useState(false);
+  const [mobilePane, setMobilePane] = useState<"controls" | "map">("controls");
 
   const set = (patch: Partial<FormParams>) => setParams((prev) => ({ ...prev, ...patch }));
   const { commit, undo, redo, canUndo, canRedo } = useUndoRedo(params, setParams);
@@ -144,6 +146,26 @@ export default function App() {
       plannedSpeedMs: speedMs,
     }));
   }, [cinematicPlan, name, heightM, speedMs]);
+  const cinematicRouteMission = useMemo<Mission | null>(() => {
+    if (!cinematicPlan) return null;
+    const baseName = name.trim() || "Cinematic House";
+    return {
+      name: `${baseName} - ${CINEMATIC_PATTERN_LABELS[params.cinematicPattern]}`.slice(
+        0,
+        MAX_TEXT_LENGTH,
+      ),
+      waypoints: cinematicPlan.combinedRoute,
+      plannedHeightM: heightM,
+      plannedSpeedMs: speedMs,
+    };
+  }, [cinematicPlan, name, params.cinematicPattern, heightM, speedMs]);
+  const cinematicOutputMissions = useMemo(
+    () =>
+      params.cinematicMode === "route" && cinematicRouteMission
+        ? [cinematicRouteMission]
+        : cinematicShotMissions,
+    [params.cinematicMode, cinematicRouteMission, cinematicShotMissions],
+  );
 
   const missionIssues = useMemo(() => validateMission(mission), [mission]);
 
@@ -355,9 +377,6 @@ export default function App() {
       if (params.manual.length >= ATOM_LIMITS.maxWaypointsPerMission) return;
       commit();
       set({ manual: [...params.manual, wp] });
-    } else {
-      commit();
-      set({ center: wp });
     }
   };
 
@@ -411,45 +430,53 @@ export default function App() {
 
   async function exportMapDb() {
     if (savedMissions.length === 0 && blocked) return;
+    if (
+      cinematicPlan &&
+      params.cinematicMode === "route" &&
+      cinematicPlan.combinedRoute.length > ATOM_LIMITS.maxWaypointsPerRecord
+    ) {
+      setCinematicActionMessage(
+        `This route has ${cinematicPlan.combinedRoute.length} points and cannot fit in one flight record.`,
+      );
+      return;
+    }
     setBusy(true);
     try {
       const SQL = await loadSql();
       const missions = savedMissions.length > 0 ? libraryMissions : [mission];
-      const bytes = generateMapDb(SQL, missions, { chunkSize });
+      const bytes = generateMapDb(SQL, missions, {
+        chunkSize:
+          cinematicPlan && params.cinematicMode === "route"
+            ? ATOM_LIMITS.maxWaypointsPerRecord
+            : chunkSize,
+      });
       downloadBytes(bytes, "map.db");
+      if (cinematicPlan && params.cinematicMode === "route") {
+        setCinematicActionMessage("Exported continuous route using one flight record.");
+      }
     } finally {
       setBusy(false);
     }
   }
 
-  function addCinematicShotPack() {
-    const result = addManyToLibrary(cinematicShotMissions);
+  function addCinematicOutput() {
+    const result = addManyToLibrary(cinematicOutputMissions);
     if (result.ok) {
-      setCinematicActionMessage(`Added ${result.count} independent shots to the mission library.`);
+      setCinematicActionMessage(
+        params.cinematicMode === "route"
+          ? "Added one continuous cinematic route to the mission library."
+          : `Added ${result.count} independent clips to the mission library.`,
+      );
       fitAll();
       return;
     }
     const messages = {
-      empty: "No cinematic shots are available.",
-      invalid: "The shot pack contains invalid mission data.",
-      capacity: "The mission library does not have room for the complete shot pack.",
+      empty: "No cinematic output is available.",
+      invalid: "The cinematic output contains invalid mission data.",
+      capacity: "The mission library does not have room for the complete cinematic output.",
       persistence: "The mission library is write-locked until a valid project is imported.",
     } as const;
     setCinematicActionMessage(messages[result.reason]);
-  }
-
-  async function exportCinematicShotPack() {
-    if (!cinematicPlan || cinematicShotMissions.length === 0) return;
-    setBusy(true);
-    setCinematicActionMessage(null);
-    try {
-      const SQL = await loadSql();
-      const bytes = generateMapDb(SQL, cinematicShotMissions, { chunkSize });
-      downloadBytes(bytes, "cinematic-shot-pack-map.db");
-      setCinematicActionMessage(`Exported ${cinematicShotMissions.length} independent shots.`);
-    } finally {
-      setBusy(false);
-    }
   }
 
   function exportCinematicChecklist() {
@@ -564,7 +591,26 @@ export default function App() {
   }
 
   return (
-    <div className="layout">
+    <div className={`layout mobile-${mobilePane}`}>
+      <nav className="mobile-view-switch" aria-label="Mobile workspace view">
+        <button
+          className={mobilePane === "controls" ? "active" : ""}
+          aria-pressed={mobilePane === "controls"}
+          onClick={() => setMobilePane("controls")}
+        >
+          Controls
+        </button>
+        <button
+          className={mobilePane === "map" ? "active" : ""}
+          aria-pressed={mobilePane === "map"}
+          onClick={() => {
+            setMobilePane("map");
+            requestAnimationFrame(() => setFitSignal((signal) => signal + 1));
+          }}
+        >
+          Map
+        </button>
+      </nav>
       <Sidebar
         missionImport={missionImport}
         isImported={isImported}
@@ -594,8 +640,7 @@ export default function App() {
         removeLastPoint={removeLastPoint}
         cinematicPlan={cinematicPlan}
         cinematicActionMessage={cinematicActionMessage}
-        onAddCinematicShotPack={addCinematicShotPack}
-        onExportCinematicShotPack={() => void exportCinematicShotPack()}
+        onAddCinematicShotPack={addCinematicOutput}
         onExportCinematicChecklist={exportCinematicChecklist}
         name={name}
         setName={setName}

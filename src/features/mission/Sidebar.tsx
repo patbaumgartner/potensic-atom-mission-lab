@@ -48,7 +48,6 @@ export interface SidebarProps {
   cinematicPlan: CinematicPlan | null;
   cinematicActionMessage: string | null;
   onAddCinematicShotPack: () => void;
-  onExportCinematicShotPack: () => void;
   onExportCinematicChecklist: () => void;
 
   name: string;
@@ -148,7 +147,6 @@ export function Sidebar(props: SidebarProps) {
             busy={props.busy}
             actionMessage={props.cinematicActionMessage}
             onAddShotPack={props.onAddCinematicShotPack}
-            onExportShotPack={props.onExportCinematicShotPack}
             onExportChecklist={props.onExportCinematicChecklist}
           />
         )}

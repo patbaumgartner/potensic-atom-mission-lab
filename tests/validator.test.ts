@@ -84,7 +84,7 @@ describe("validateCinematicPlan", () => {
   const plan = generateCinematicPlan({
     center: ORIGIN,
     frontBearingDeg: 0,
-    viewCount: 8,
+    pattern: "full",
     buildingWidthM: 20,
     buildingDepthM: 15,
     clearanceM: 20,
@@ -120,6 +120,16 @@ describe("validateCinematicPlan", () => {
       "cinematic-gimbal-up",
       "cinematic-library-capacity",
     ]);
+
+    const clipsCapacity = validateCinematicPlan(
+      { ...cinematicParams, cinematicMode: "shots" },
+      plan,
+      0,
+      25,
+    );
+    expect(
+      clipsCapacity.find((issue) => issue.code === "cinematic-library-capacity")?.message,
+    ).toBe("The library needs 8 free slots for this cinematic output.");
   });
 
   it("detects route allocation and endpoint clearance violations", () => {

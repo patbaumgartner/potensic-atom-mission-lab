@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cinematicPatternViewCount,
   cinematicBuildingFootprint,
   cinematicSafetyRadius,
   cinematicViewDefinitions,
@@ -16,7 +17,7 @@ const CENTER = { lat: 47.4150833, lng: 9.3953087 };
 const PARAMS: CinematicParams = {
   center: CENTER,
   frontBearingDeg: 0,
-  viewCount: 8,
+  pattern: "full",
   buildingWidthM: 20,
   buildingDepthM: 15,
   clearanceM: 20,
@@ -28,7 +29,7 @@ const PARAMS: CinematicParams = {
 
 describe("cinematic view geometry", () => {
   it("builds eight facade and corner views clockwise from the configured front", () => {
-    const views = cinematicViewDefinitions(350, 8);
+    const views = cinematicViewDefinitions(350, "full");
     expect(views.map((view) => view.label)).toEqual([
       "Front",
       "Front-right corner",
@@ -45,11 +46,23 @@ describe("cinematic view geometry", () => {
   });
 
   it("uses the four corner views in four-view mode", () => {
-    expect(cinematicViewDefinitions(-10, 4)).toEqual([
+    expect(cinematicViewDefinitions(-10, "corners")).toEqual([
       { label: "Front-right corner", subjectBearingDeg: 35 },
       { label: "Rear-right corner", subjectBearingDeg: 125 },
       { label: "Rear-left corner", subjectBearingDeg: 215 },
       { label: "Front-left corner", subjectBearingDeg: 305 },
+    ]);
+  });
+
+  it("builds practical hero and facade patterns in clockwise order", () => {
+    expect(cinematicViewDefinitions(0, "hero").map((view) => view.subjectBearingDeg)).toEqual([
+      315, 0, 45,
+    ]);
+    expect(cinematicViewDefinitions(0, "facades").map((view) => view.label)).toEqual([
+      "Front",
+      "Right",
+      "Rear",
+      "Left",
     ]);
   });
 
@@ -65,6 +78,18 @@ describe("cinematic view geometry", () => {
 });
 
 describe("cinematic shot plan", () => {
+  it.each([
+    ["hero", 3],
+    ["corners", 4],
+    ["facades", 4],
+    ["full", 8],
+  ] as const)("keeps the %s continuous pattern within one flight record", (pattern, views) => {
+    const plan = generateCinematicPlan({ ...PARAMS, pattern });
+    expect(cinematicPatternViewCount(pattern)).toBe(views);
+    expect(plan.shots).toHaveLength(views);
+    expect(plan.combinedRoute.length).toBeLessThanOrEqual(ATOM_LIMITS.maxWaypointsPerRecord);
+  });
+
   it("creates smooth two-waypoint shots that fly directly toward the subject", () => {
     const plan = generateCinematicPlan(PARAMS);
     expect(plan.shots).toHaveLength(8);
