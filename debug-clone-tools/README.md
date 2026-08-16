@@ -21,7 +21,7 @@ the upload/backup mechanics safely.
 | `patch-clone-privacy.sh`         | The "My Atom" privacy patch: rename, strip Bugly + Mapbox trackers, disable self-update and beginner guide, add an in-app `map.db` importer. |
 | `pull-potensicpro-logs.sh`       | Read-only pull of logs, metadata, shared storage, and sandbox (`run-as`).                                                                    |
 | `push-mapdb-to-clone.sh`         | Backup-first upload of a generated `map.db` into the clone sandbox.                                                                          |
-| `debug-clone.keystore`           | Local signing key for the rebuilt/clone APKs.                                                                                                |
+| `debug-clone.keystore`           | Per-user signing key generated on first build and ignored by Git.                                                                            |
 
 ## Prerequisites
 
@@ -63,6 +63,12 @@ debug-clone-tools/make-potensicpro-debuggable.sh --clone-package debug --privacy
 - Add `--device HOST:PORT` for an explicit wireless endpoint
 
 Output lands under `debuggable-apk/potensicpro-debuggable-YYYYMMDD-HHMMSS/`.
+
+The first build creates `debug-clone-tools/debug-clone.keystore` with private
+file permissions. Keep that file: Android requires the same signing key for
+`adb install -r` updates. Losing it means backing up the clone, uninstalling it,
+and reinstalling a build signed with the replacement key. The historical shared
+debug key was public and must not be treated as a trusted signing identity.
 
 Install and verify `run-as`:
 

@@ -87,6 +87,18 @@ die() {
   exit 1
 }
 
+validate_package_name() {
+  local value="$1"
+  [[ "$value" =~ ^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$ ]] ||
+    die "invalid Android package name: $value"
+}
+
+validate_clone_label() {
+  [[ -n "$CLONE_LABEL" && ${#CLONE_LABEL} -le 80 ]] || die "clone label must be 1-80 characters"
+  [[ "$CLONE_LABEL" != *$'\n'* && "$CLONE_LABEL" != *$'\r'* && "$CLONE_LABEL" != *'<'* && "$CLONE_LABEL" != *'>'* ]] ||
+    die "clone label contains unsupported characters"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --pull-from-device)
@@ -159,6 +171,12 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+validate_package_name "$PACKAGE"
+if [[ -n "$CLONE_PACKAGE" ]]; then
+  validate_package_name "$CLONE_PACKAGE"
+  validate_clone_label
+fi
 
 find_build_tool() {
   local name="$1"
@@ -326,6 +344,8 @@ generate_keystore_if_needed() {
   fi
 
   log "Generating local debug keystore $KEYSTORE"
+  mkdir -p "$(dirname -- "$KEYSTORE")"
+  umask 077
   keytool -genkeypair \
     -keystore "$KEYSTORE" \
     -storepass "$KEY_PASS" \
@@ -335,6 +355,7 @@ generate_keystore_if_needed() {
     -keysize 2048 \
     -validity 10000 \
     -dname "CN=Local Potensic Debug,O=Local Research,C=XX" >/dev/null
+  chmod 600 "$KEYSTORE"
 }
 
 sign_apk() {
