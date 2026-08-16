@@ -31,7 +31,7 @@ interface ParsedFlightRecord {
 }
 
 /** One completed real flight, as logged by the device into `flightnotes`. */
-export interface FlightHistoryEntry {
+interface FlightHistoryEntry {
   id: number;
   distanceM: number;
   durationMs: number;

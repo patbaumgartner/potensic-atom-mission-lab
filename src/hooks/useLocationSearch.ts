@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { formatSwissAddress, type NominatimAddress } from "../features/geo/formatAddress";
 import type { Waypoint } from "../features/mission/missionTypes";
 
-export const LOCATION_SEARCH_TIMEOUT_MS = 8_000;
+const LOCATION_SEARCH_TIMEOUT_MS = 8_000;
 export const MAX_LOCATION_RESPONSE_BYTES = 256 * 1024;
 const MIN_SEARCH_INTERVAL_MS = 1_000;
 
