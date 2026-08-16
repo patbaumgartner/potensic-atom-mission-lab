@@ -7,7 +7,9 @@ const scripts = [
   "debug-clone-tools/push-mapdb-to-clone.sh",
 ];
 
-describe("debug clone script input validation", () => {
+const bashAvailable = spawnSync("bash", ["--version"], { encoding: "utf8" }).status === 0;
+
+describe.runIf(bashAvailable)("debug clone script input validation", () => {
   it.each(scripts)("rejects hostile package names before invoking tools: %s", (script) => {
     const result = spawnSync("bash", [script, "--package", "com.example;touch /tmp/injected"], {
       encoding: "utf8",
