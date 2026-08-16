@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose a concrete planner or workflow improvement
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or field workflow
+      description: Describe the real task or limitation, not only the proposed control.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: Include defaults, constraints, and expected export behaviour.
+    validations:
+      required: true
+  - type: textarea
+    id: capability
+    attributes:
+      label: Drone capability evidence
+      description: Note what was observed on a real first-generation Atom versus what is assumed or advisory.
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety and compatibility considerations
+      description: Consider obstacles, geofencing, waypoint limits, manual override, PotensicPro schema, and migration of saved projects.

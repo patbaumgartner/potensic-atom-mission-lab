@@ -31,7 +31,6 @@ export default defineConfig({
         "src/features/mission/paramFields.tsx",
         "src/features/mission/paramList.tsx",
         "src/features/mission/panels/**",
-        "src/features/mission/useMissionLibrary.ts",
         "src/features/potensic/sqlLoader.ts",
         // These hooks need a live browser / navigator API and are validated via E2E:
         "src/hooks/useMissionImport.ts",

@@ -46,6 +46,27 @@ pass `--device HOST:PORT` (or `--connect HOST:PORT` where supported).
 
 Run every script from the repository root.
 
+### Native Linux and macOS
+
+The scripts require Bash but do not require WSL when Android tools are installed
+locally. Pass explicit tool paths instead of the WSL defaults:
+
+```bash
+# Native Linux example
+debug-clone-tools/make-potensicpro-debuggable.sh \
+  --adb "$HOME/Android/Sdk/platform-tools/adb" \
+  --build-tools "$HOME/Android/Sdk/build-tools/36.0.0" \
+  --clone-package debug --privacy
+
+# macOS example (adjust ANDROID_HOME for your installation)
+debug-clone-tools/push-mapdb-to-clone.sh \
+  --adb "$ANDROID_HOME/platform-tools/adb" --latest
+```
+
+`apktool`, Java, and `keytool` must also be on `PATH`. The APK patching scripts
+are intentionally Bash tools; the browser planner and its npm checks remain
+cross-platform.
+
 ## 1. Build the side-by-side clone
 
 Create a debuggable package that installs next to the Play Store app, de-tracked
