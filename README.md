@@ -52,8 +52,11 @@ live control-frame injection.
 
 ## Getting started
 
+Requires Node.js 22 or 24 and npm. With `nvm`, run `nvm use` to select the
+repository's Node 22 baseline.
+
 ```bash
-npm install
+npm ci
 npm run dev            # start the planner at http://localhost:5173
 ```
 
@@ -64,12 +67,14 @@ npm run build          # typecheck + production build
 npm test               # run the unit tests
 npm run test:coverage  # tests with a 100% coverage gate
 npm run generate:sample -- circle 30 12   # write fixtures/sample-map.db
+npm run check          # typecheck + lint + format + coverage + build
+npm run knip           # unused files/exports/dependencies
 ```
 
 ## How it works
 
-1. Search a location, click the map, or use **Drop center** to set where the
-   mission is planned.
+1. Search a location or use **Drop center**, then tap the map to set where the
+   mission is planned. Ordinary map taps do not move the center.
 2. Pick a form and adjust its parameters, or draw a manual path.
 3. Review the stats and safety warnings, then **Export map.db**.
 4. Load the `map.db` onto the drone using the
@@ -218,21 +223,33 @@ as a single JSON file. Share it with a colleague or move it between devices with
 ## Deployment
 
 Every push to `main` builds the app and publishes it to **GitHub Pages** via the
-[deploy workflow](.github/workflows/deploy.yml). Enable it once under
-**Settings → Pages → Build and deployment → Source: GitHub Actions**. The live
-build is at
+[deploy workflow](.github/workflows/deploy.yml). The live build is at
 <https://patbaumgartner.github.io/potensic-atom-mission-lab/>.
 
 ## Contributing
 
-Issues and pull requests are welcome. Before opening a PR, please make sure the
-checks pass locally:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks, testing expectations,
+and flight-safety guidance. Before opening a pull request, run:
 
 ```bash
-npm run typecheck
-npm run test:coverage   # must stay at 100% on logic modules
-npm run build
+npm run check
+npm run knip
+npm run audit:prod
 ```
+
+Please report vulnerabilities privately as described in
+[SECURITY.md](SECURITY.md). Participation is governed by the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Privacy and external services
+
+- Missions, projects, imported tracks, and settings stay in your browser's local
+  storage unless you export a file. Local storage is not encrypted.
+- Address queries are sent to OpenStreetMap Nominatim. Map tile requests go to
+  OpenStreetMap or Esri and reveal the requested map area plus normal network
+  metadata to those providers.
+- **My location** uses the browser geolocation API. The coordinate remains local,
+  although centering the map naturally requests tiles for the surrounding area.
 
 ## Disclaimer
 

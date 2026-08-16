@@ -4,6 +4,10 @@ All notable user-facing changes are recorded here. The project follows Semantic 
 
 ## Unreleased
 
+### Added
+
+- Added contributor setup/check guidance, a private security reporting policy, a code of conduct, structured issue forms, and a pull request checklist.
+
 ### Security
 
 - Removed the repository-shared APK signing key. Debug clone builds now generate a private, per-user keystore on first use.

@@ -1,0 +1,58 @@
+name: Bug report
+description: Report reproducible incorrect behaviour
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting a problem. Remove private coordinates, device identifiers, APKs, signing keys, and captured account data.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Live site, commit SHA, or local branch.
+      placeholder: "Live site / d142efd"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser/version, phone model, PotensicPro version, and drone model where relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Export ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Supporting evidence
+      description: Sanitized screenshots, console errors, or a minimal non-sensitive fixture.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety impact
+      options:
+        - label: This affected or could affect an actual flight.
+        - label: I kept controller override available and stopped testing when behaviour was unexpected.
