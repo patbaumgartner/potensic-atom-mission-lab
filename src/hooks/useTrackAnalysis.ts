@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { pathDeviation, pathLengthMeters } from "../features/mission/geometry";
-import { parseTrack, type ImportedTrack } from "../features/logs/trackImport";
+import { MAX_TRACK_FILE_BYTES, parseTrack, type ImportedTrack } from "../features/logs/trackImport";
 import type { Waypoint } from "../features/mission/missionTypes";
 
 export interface UseTrackAnalysisReturn {
@@ -27,6 +27,11 @@ export function useTrackAnalysis(plannedWaypoints: Waypoint[]): UseTrackAnalysis
     if (!file) return;
     setActualErr(null);
     try {
+      if (file.size > MAX_TRACK_FILE_BYTES) {
+        setActualErr("That track file is too large to analyze safely.");
+        setActual(null);
+        return;
+      }
       const text = await file.text();
       const track = parseTrack(text, file.name);
       if (track.points.length === 0) {

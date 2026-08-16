@@ -3,6 +3,9 @@
 
 import type { Waypoint } from "../mission/missionTypes";
 
+export const MAX_TRACK_FILE_BYTES = 10 * 1024 * 1024;
+export const MAX_TRACK_POINTS = 5_000;
+
 export interface ImportedTrack {
   name: string;
   points: Waypoint[];
@@ -17,6 +20,9 @@ interface GeoJSONNode {
 }
 
 export function parseTrack(text: string, filename: string): ImportedTrack {
+  if (text.length > MAX_TRACK_FILE_BYTES) {
+    throw new Error("Track file is too large");
+  }
   const name = filename.replace(/\.[^.]+$/, "");
   const lower = filename.toLowerCase();
   const trimmed = text.trimStart();
@@ -31,13 +37,22 @@ export function parseTrack(text: string, filename: string): ImportedTrack {
   return { name, points };
 }
 
+function addPoint(points: Waypoint[], lat: number, lng: number): void {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+  if (lat < -90 || lat > 90 || lng < -180 || lng >= 180) return;
+  if (points.length >= MAX_TRACK_POINTS) {
+    throw new Error(`Track exceeds ${MAX_TRACK_POINTS} points`);
+  }
+  points.push({ lat, lng });
+}
+
 function parseGpx(text: string): Waypoint[] {
   const doc = new DOMParser().parseFromString(text, "application/xml");
   const pts: Waypoint[] = [];
   doc.querySelectorAll("trkpt, rtept, wpt").forEach((el) => {
     const lat = parseFloat(el.getAttribute("lat") ?? "");
     const lng = parseFloat(el.getAttribute("lon") ?? "");
-    if (Number.isFinite(lat) && Number.isFinite(lng)) pts.push({ lat, lng });
+    addPoint(pts, lat, lng);
   });
   return pts;
 }
@@ -51,7 +66,7 @@ function parseGeoJSON(text: string): Waypoint[] {
       if (Array.isArray(c) && c.length >= 2) {
         const lng = Number(c[0]);
         const lat = Number(c[1]);
-        if (Number.isFinite(lat) && Number.isFinite(lng)) out.push({ lat, lng });
+        addPoint(out, lat, lng);
       }
     }
   };
@@ -102,7 +117,7 @@ function parseCsv(text: string): Waypoint[] {
     const parts = split(lines[i]);
     const lat = parseFloat(parts[latIdx]);
     const lng = parseFloat(parts[lngIdx]);
-    if (Number.isFinite(lat) && Number.isFinite(lng)) out.push({ lat, lng });
+    addPoint(out, lat, lng);
   }
   return out;
 }
