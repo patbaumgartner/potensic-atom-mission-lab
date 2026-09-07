@@ -11,6 +11,11 @@ updates:
     labels:
       - dependencies
     groups:
+      # vitest and its coverage provider must move in lockstep.
+      vitest:
+        patterns:
+          - vitest
+          - "@vitest/*"
       dev-dependencies:
         dependency-type: development
         update-types:
