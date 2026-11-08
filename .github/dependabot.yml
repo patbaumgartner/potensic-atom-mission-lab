@@ -1,54 +1,54 @@
 version: 2
 updates:
-- package-ecosystem: npm
-  directory: /
-  schedule:
-    interval: weekly
-    day: monday
-    time: "06:00"
-    timezone: Europe/Zurich
-  open-pull-requests-limit: 10
-  labels:
-  - dependencies
-  groups:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Zurich
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    groups:
       # vitest and its coverage provider must move in lockstep.
-    vitest:
-      patterns:
-      - vitest
-      - "@vitest/*"
-    dev-dependencies:
-      dependency-type: development
-      update-types:
-      - minor
-      - patch
-    production-minor-patch:
-      dependency-type: production
-      update-types:
-      - minor
-      - patch
-  commit-message:
-    prefix: chore(deps)
-    prefix-development: chore(deps-dev)
-    include: scope
-- package-ecosystem: github-actions
-  directory: /
-  schedule:
-    interval: weekly
-    day: monday
-    time: "06:00"
-    timezone: Europe/Zurich
-  labels:
-  - dependencies
-  - github-actions
-  groups:
-    actions:
-      patterns:
-      - "*"
-    multi-step-actions:
-      patterns:
-      - actions/cache/*
-      - github/codeql-action/*
-  open-pull-requests-limit: 5
-  commit-message:
-    prefix: ci(deps)
-    include: scope
+      vitest:
+        patterns:
+          - vitest
+          - "@vitest/*"
+      dev-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      production-minor-patch:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: chore(deps)
+      prefix-development: chore(deps-dev)
+      include: scope
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Zurich
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      actions:
+        patterns:
+          - "*"
+      multi-step-actions:
+        patterns:
+          - actions/cache/*
+          - github/codeql-action/*
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci(deps)
+      include: scope
