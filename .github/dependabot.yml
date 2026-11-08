@@ -43,11 +43,10 @@ updates:
     actions:
       patterns:
       - '*'
+    multi-step-actions:
+      patterns:
+      - github/codeql-action/*
   open-pull-requests-limit: 5
   commit-message:
     prefix: ci(deps)
     include: scope
-groups:
-  multi-step-actions:
-    patterns:
-    - github/codeql-action/*
