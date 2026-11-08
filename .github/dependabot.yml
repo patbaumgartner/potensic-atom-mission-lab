@@ -5,16 +5,17 @@ updates:
   schedule:
     interval: weekly
     day: monday
-    time: 06:00
+    time: "06:00"
     timezone: Europe/Zurich
   open-pull-requests-limit: 10
   labels:
   - dependencies
   groups:
+      # vitest and its coverage provider must move in lockstep.
     vitest:
       patterns:
       - vitest
-      - '@vitest/*'
+      - "@vitest/*"
     dev-dependencies:
       dependency-type: development
       update-types:
@@ -34,7 +35,7 @@ updates:
   schedule:
     interval: weekly
     day: monday
-    time: 06:00
+    time: "06:00"
     timezone: Europe/Zurich
   labels:
   - dependencies
@@ -42,9 +43,10 @@ updates:
   groups:
     actions:
       patterns:
-      - '*'
+      - "*"
     multi-step-actions:
       patterns:
+      - actions/cache/*
       - github/codeql-action/*
   open-pull-requests-limit: 5
   commit-message:
