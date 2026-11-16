@@ -51,7 +51,7 @@
     "leaflet": "^1.9.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "sql.js": "^1.15.2"
+    "sql.js": "^1.16.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
