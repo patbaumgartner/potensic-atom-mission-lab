@@ -12,7 +12,7 @@ export function loadSqlNode(): Promise<SqlJsStatic> {
     const wasmPath = require.resolve("sql.js/dist/sql-wasm.wasm");
     const buf = readFileSync(wasmPath);
     const wasmBinary = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-    cached = initSqlJs({ wasmBinary });
+    cached = initSqlJs({ wasmBinary, useOldExtensionFunctions: true });
   }
   return cached;
 }

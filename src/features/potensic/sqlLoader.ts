@@ -5,6 +5,6 @@ import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 let cached: Promise<SqlJsStatic> | null = null;
 
 export function loadSql(): Promise<SqlJsStatic> {
-  cached ??= initSqlJs({ locateFile: () => wasmUrl });
+  cached ??= initSqlJs({ locateFile: () => wasmUrl, useOldExtensionFunctions: true });
   return cached;
 }
